@@ -40,6 +40,63 @@ print_usage() {
   echo "If no options are provided, the script will run in interactive mode."
 }
 
+new_client_setup() {
+  # Check if this is the initial StartOS setup
+  if [[ -n "$STARTOS_HOSTNAME" && "$client" == "$STARTOS_HOSTNAME" ]]; then
+    # For StartOS, always use 10.59.0.2
+    octet=2
+  else
+    # For other clients, start from 10.59.0.10
+    octet=10
+    while grep AllowedIPs /etc/wireguard/wg0.conf | cut -d "." -f 4 | cut -d "/" -f 1 | grep -q "^$octet$"; do
+      ((octet++))
+    done
+    # Don't break the WireGuard configuration in case the address space is full
+    if [[ "$octet" -eq 255 ]]; then
+      print_error "245 clients are already configured. The WireGuard internal subnet is full!"
+      exit 1
+    fi
+  fi
+
+  key=$(wg genkey)
+  psk=$(wg genpsk)
+  # Configure client in the server
+  cat <<EOF >>/etc/wireguard/wg0.conf
+# BEGIN_PEER $client
+[Peer]
+PublicKey = $(wg pubkey <<<$key)
+PresharedKey = $psk
+AllowedIPs = 10.59.0.$octet/32$(grep -q 'fddd:2c4:2c4:2c4::1' /etc/wireguard/wg0.conf && echo ", fddd:2c4:2c4:2c4::$octet/128")
+# END_PEER $client
+EOF
+  # Create client configuration
+  server_private_key=$(grep '^PrivateKey = ' /etc/wireguard/wg0.conf | cut -d " " -f 3)
+  server_public_key=$(wg pubkey <<<"$server_private_key")
+  cat <<EOF >~/"$client".conf
+[Interface]
+Address = 10.59.0.$octet/24$(grep -q 'fddd:2c4:2c4:2c4::1' /etc/wireguard/wg0.conf && echo ", fddd:2c4:2c4:2c4::$octet/64")
+PrivateKey = $key
+DNS = 8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1
+
+[Peer]
+PublicKey = $server_public_key
+PresharedKey = $psk
+AllowedIPs = 0.0.0.0/0, ::/0
+Endpoint = $(grep '^# ENDPOINT' /etc/wireguard/wg0.conf | cut -d " " -f 3):$(grep ListenPort /etc/wireguard/wg0.conf | cut -d " " -f 3)
+PersistentKeepalive = 25
+EOF
+  print_success "Client configuration created: ~/$client.conf"
+
+  # Display QR code if qrencode is available
+  if command -v qrencode &>/dev/null; then
+    print_status "Scan this QR code with your WireGuard app:"
+    qrencode -t ansiutf8 <~/"$client".conf
+  else
+    print_warning "qrencode not found. Install it to display QR codes for client configurations."
+  fi
+}
+
+
 # Function to handle command line arguments
 handle_args() {
   case "$1" in
@@ -200,62 +257,6 @@ get_primary_interface() {
   echo "$interface"
 }
 PRIMARY_INTERFACE=$(get_primary_interface)
-
-new_client_setup() {
-  # Check if this is the initial StartOS setup
-  if [[ -n "$STARTOS_HOSTNAME" && "$client" == "$STARTOS_HOSTNAME" ]]; then
-    # For StartOS, always use 10.59.0.2
-    octet=2
-  else
-    # For other clients, start from 10.59.0.10
-    octet=10
-    while grep AllowedIPs /etc/wireguard/wg0.conf | cut -d "." -f 4 | cut -d "/" -f 1 | grep -q "^$octet$"; do
-      ((octet++))
-    done
-    # Don't break the WireGuard configuration in case the address space is full
-    if [[ "$octet" -eq 255 ]]; then
-      print_error "245 clients are already configured. The WireGuard internal subnet is full!"
-      exit 1
-    fi
-  fi
-
-  key=$(wg genkey)
-  psk=$(wg genpsk)
-  # Configure client in the server
-  cat <<EOF >>/etc/wireguard/wg0.conf
-# BEGIN_PEER $client
-[Peer]
-PublicKey = $(wg pubkey <<<$key)
-PresharedKey = $psk
-AllowedIPs = 10.59.0.$octet/32$(grep -q 'fddd:2c4:2c4:2c4::1' /etc/wireguard/wg0.conf && echo ", fddd:2c4:2c4:2c4::$octet/128")
-# END_PEER $client
-EOF
-  # Create client configuration
-  server_private_key=$(grep '^PrivateKey = ' /etc/wireguard/wg0.conf | cut -d " " -f 3)
-  server_public_key=$(wg pubkey <<<"$server_private_key")
-  cat <<EOF >~/"$client".conf
-[Interface]
-Address = 10.59.0.$octet/24$(grep -q 'fddd:2c4:2c4:2c4::1' /etc/wireguard/wg0.conf && echo ", fddd:2c4:2c4:2c4::$octet/64")
-PrivateKey = $key
-DNS = 8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1
-
-[Peer]
-PublicKey = $server_public_key
-PresharedKey = $psk
-AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = $(grep '^# ENDPOINT' /etc/wireguard/wg0.conf | cut -d " " -f 3):$(grep ListenPort /etc/wireguard/wg0.conf | cut -d " " -f 3)
-PersistentKeepalive = 25
-EOF
-  print_success "Client configuration created: ~/$client.conf"
-
-  # Display QR code if qrencode is available
-  if command -v qrencode &>/dev/null; then
-    print_status "Scan this QR code with your WireGuard app:"
-    qrencode -t ansiutf8 <~/"$client".conf
-  else
-    print_warning "qrencode not found. Install it to display QR codes for client configurations."
-  fi
-}
 
 if [[ ! -e /etc/wireguard/wg0.conf ]]; then
   # Detect some Debian minimal setups where neither wget nor curl are installed
