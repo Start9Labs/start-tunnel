@@ -40,6 +40,11 @@ print_usage() {
   echo "If no options are provided, the script will run in interactive mode."
 }
 
+#Before any function is run, ensure the VPS has DNS capabilities:
+#If we can't resolve yahoo.com, insert a very basic (semi-privacy respecting nameserver w/ no eDNS) into /etc/resolv.conf
+# ... otherwise all curl, wget and package manager commands will fail
+if [ "$(getent hosts yahoo.com)" == "" ] ; then echo "nameserver 1.1.1.1" >> /etc/resolv.conf ; fi
+
 new_client_setup() {
   # Check if this is the initial StartOS setup
   if [[ -n "$STARTOS_HOSTNAME" && "$client" == "$STARTOS_HOSTNAME" ]]; then
