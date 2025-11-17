@@ -236,7 +236,7 @@ check_existing_installation() {
         printf "  %sReinstall StartTunnel? [y/N]:%s " "$BOLD" "$RESET"
         
         # Read user input
-        read -r REINSTALL_RESPONSE
+        read -r REINSTALL_RESPONSE < /dev/tty
         
         case "$REINSTALL_RESPONSE" in
             [yY]|[yY][eE][sS])
