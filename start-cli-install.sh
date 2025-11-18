@@ -40,9 +40,9 @@ info() { printf "%s•%s %s\n" "$YELLOW" "$RESET" "$1"; }
 success() { printf "%s✓%s %s\n" "$GREEN" "$RESET" "$1"; }
 
 # Configuration - FIXED VERSION FORMAT
-VERSION="0.4.0-alpha.13"
+VERSION="0.4.0-alpha.12"
 BASE_URL="https://github.com/Start9Labs/start-os/releases/download/v${VERSION}"
-PACKAGE_PREFIX="start-tunnel-${VERSION}-2fbaaeb.dev"
+PACKAGE_PREFIX="start-tunnel-${VERSION}-unknown.dev"
 PACKAGE_NAME_BASE="start-tunnel"
 SERVICE_NAME="start-tunneld.service"
 MIN_DEBIAN_VERSION=12
