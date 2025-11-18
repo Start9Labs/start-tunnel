@@ -218,7 +218,7 @@ options timeout:2 attempts:3 rotate
 EOF
         
         # Make it immutable to prevent DHCP or other services from overwriting
-        chattr +i /etc/resolv.conf 2>/dev/null || true
+#        chattr +i /etc/resolv.conf 2>/dev/null || true
         success "DNS configuration updated"
     fi
 }
