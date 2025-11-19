@@ -686,6 +686,8 @@ main() {
     box_empty
     box_end
     printf "\n"
+    # Close TTY redirection if it was opened
+    exec 0<&- 2>/dev/null || true
 }
 
 main "$@"
