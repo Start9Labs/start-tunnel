@@ -24,6 +24,13 @@ fi
 BOX_WIDTH=63
 BOX_COLOR="$DIM"  # Default box color
 
+# Fix stdin for piped execution (curl | sh)
+fix_stdin() {
+    if [ ! -t 0 ]; then
+        exec < /dev/tty
+    fi
+}
+
 # Universal box drawing functions
 box_start() {
     BOX_COLOR="${1:-$DIM}"
@@ -639,6 +646,7 @@ configure_web_ui() {
 }
 
 main() {
+    fix_stdin
     check_debian
     ensure_root "$@"
     check_existing_installation
