@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 # start-tunnel installer for Debian VPS systems
 # Downloads and installs start-tunnel from official GitHub releases
 
@@ -96,9 +96,9 @@ printf "\n"
 err() { printf "%sError:%s %s\n" "$RED$BOLD" "$RESET" "$1" >&2; exit 1; }
 
 # Configuration
-VERSION="0.4.0-alpha.12"
+VERSION="0.4.0-alpha.14"
 BASE_URL="https://github.com/Start9Labs/start-os/releases/download/v${VERSION}"
-PACKAGE_PREFIX="start-tunnel-${VERSION}-unknown.dev"
+PACKAGE_PREFIX="start-tunnel-${VERSION}-66188d7.dev"
 PACKAGE_NAME_BASE="start-tunnel"
 SERVICE_NAME="start-tunneld.service"
 MIN_DEBIAN_VERSION=12
@@ -187,10 +187,7 @@ check_debian() {
 
 ensure_root() {
     if [ "$(id -u)" -ne 0 ]; then
-        if ! command -v sudo >/dev/null 2>&1; then
-            err "This script requires root privileges but sudo is not available"
-        fi
-        exec sudo sh "$0" "$@"
+        err "This script requires root privileges. Please run it with sudo or as the root user."
     fi
 }
 
@@ -648,7 +645,7 @@ configure_web_ui() {
 main() {
     fix_stdin
     check_debian
-    ensure_root "$@"
+    ensure_root
     check_existing_installation
     
     if [ "$FRESH_INSTALL" = true ]; then
