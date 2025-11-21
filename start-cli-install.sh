@@ -187,7 +187,25 @@ check_debian() {
 
 ensure_root() {
     if [ "$(id -u)" -ne 0 ]; then
-        err "This script requires root privileges. Please run it with sudo or as the root user."
+        if ! command -v sudo >/dev/null 2>&1; then
+            err "This script requires root privileges but sudo is not available"
+        fi
+
+        # For piped execution (curl | sh), $0 is not the script file.
+        # We must re-download the script and pipe it to a new shell with sudo.
+        # The URL is hardcoded here to make this possible.
+        SCRIPT_URL="http://start9labs.github.io/wireguard-vps-proxy-setup"
+
+        printf "\n"
+        box_start "$DIM$YELLOW"
+        box_empty
+        box_line "This script requires root privileges."
+        box_line "Please enter your password for sudo to continue."
+        box_empty
+        box_end
+        printf "\n"
+
+        exec sudo sh -c "$(curl -sSL $SCRIPT_URL)" -- "$@"
     fi
 }
 
