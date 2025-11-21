@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# start-tunnel installer for Debian VPS systems
+# start-tunnel installer for Debian 12+ VPS systems
 # Downloads and installs start-tunnel from official GitHub releases
 
 set -e
@@ -20,82 +20,156 @@ else
     BOLD='' BLUE='' GREEN='' YELLOW='' RED='' WHITE='' GREY='' RESET='' DIM=''
 fi
 
-# Box configuration
 BOX_WIDTH=63
-BOX_COLOR="$DIM"  # Default box color
+BOX_COLOR="$DIM"
 
-# Fix stdin for piped execution (curl | sh)
+box_start() {
+    BOX_COLOR="${1:-$DIM}"
+    printf "%s┌───────────────────────────────────────────────────────────────┐%s\n" "$BOX_COLOR" "$RESET"
+}
+box_end() {
+    printf "%s└───────────────────────────────────────────────────────────────┘%s\n" "$BOX_COLOR" "$RESET"
+}
+box_empty() {
+    printf "%s│%s                                                               %s│%s\n" "$BOX_COLOR" "$RESET" "$BOX_COLOR" "$RESET"
+}
+box_line() {
+    text="$1"
+    align="${2:-left}"
+    text_style="${3:-}"
+    text_len=$(printf "%s" "$text" | wc -m | tr -d ' ')
+    if printf "%s" "$text" | grep -q "[✓✗●○◆◇★☆]"; then
+        text_len=$((text_len - 2))
+    fi
+    if [ "$align" = "center" ]; then
+        left_pad=$(( (61 - text_len) / 2 ))
+        right_pad=$(( 63 - text_len - left_pad ))
+        printf "%s│%s%*s%s%s%s%*s%s│%s\n" \
+            "$BOX_COLOR" "$RESET" \
+            "$left_pad" "" \
+            "$text_style" "$text" "$RESET" \
+            "$right_pad" "" \
+            "$BOX_COLOR" "$RESET"
+    else
+        padding=$(( 61 - text_len ))
+        printf "%s│%s  %s%s%s%*s%s│%s\n" \
+            "$BOX_COLOR" "$RESET" \
+            "$text_style" "$text" "$RESET" \
+            "$padding" "" \
+            "$BOX_COLOR" "$RESET"
+    fi
+}
+
+err() {
+    printf "%sError:%s %s\n" "$RED$BOLD" "$RESET" "$1" >&2
+    exit 1
+}
+
 fix_stdin() {
     if [ ! -t 0 ]; then
         exec < /dev/tty
     fi
 }
 
-# Universal box drawing functions
-box_start() {
-    BOX_COLOR="${1:-$DIM}"
-    printf "%s┌───────────────────────────────────────────────────────────────┐%s\n" "$BOX_COLOR" "$RESET"
-}
-
-box_end() {
-    printf "%s└───────────────────────────────────────────────────────────────┘%s\n" "$BOX_COLOR" "$RESET"
-}
-
-box_empty() {
-    printf "%s│%s                                                               %s│%s\n" "$BOX_COLOR" "$RESET" "$BOX_COLOR" "$RESET"
-}
-
-box_line() {
-    local text="$1"
-    local align="${2:-left}"     # left, center
-    local text_style="${3:-}"     # Optional: $BOLD, $GREEN$BOLD, etc.
-    
-    # Use wc -m to count characters (handles UTF-8)
-    local text_len=$(printf "%s" "$text" | wc -m | tr -d ' ')
-    
-    # Adjust for multi-byte UTF-8 special characters (✓✗●○◆◇★☆)
-    # Note: Only use ONE special character per line for proper alignment
-    if printf "%s" "$text" | grep -q "[✓✗●○◆◇★☆]"; then
-        text_len=$((text_len - 2))
+# Support only Debian 12+, inform early if not and exit
+check_debian() {
+    if [ ! -f /etc/os-release ]; then
+        printf "\n"
+        box_start "$DIM$RED"
+        box_empty
+        box_line "StartTunnel requires Debian 12+ (Bookworm or newer)." center "$BOLD"
+        box_empty
+        box_line "Could not find /etc/os-release: unsupported system." center
+        box_empty
+        box_end
+        printf "\n"
+        exit 1
     fi
-    
-    case "$align" in
-        center)
-            local left_pad=$(( (61 - text_len) / 2 ))
-            local right_pad=$(( 61 - text_len - left_pad ))
-            printf "%s│%s%*s%s%s%s%*s%s│%s\n" \
-                "$BOX_COLOR" "$RESET" \
-                "$left_pad" "" \
-                "$text_style" "$text" "$RESET" \
-                "$right_pad" "" \
-                "$BOX_COLOR" "$RESET"
-            ;;
-        *)  # left alignment (default)
-            local padding=$(( 61 - text_len ))
-            printf "%s│%s  %s%s%s%*s%s│%s\n" \
-                "$BOX_COLOR" "$RESET" \
-                "$text_style" "$text" "$RESET" \
-                "$padding" "" \
-                "$BOX_COLOR" "$RESET"
-            ;;
-    esac
+    . /etc/os-release
+    if [ "$ID" != "debian" ]; then
+        printf "\n"
+        box_start "$DIM$RED"
+        box_empty
+        box_line "StartTunnel installer supports ONLY Debian 12+ (Bookworm or newer)." center "$BOLD"
+        box_empty
+        box_line "Detected: $NAME" center
+        box_line "Please run this script on Debian 12+ VPS." center
+        box_empty
+        box_end
+        printf "\n"
+        exit 1
+    fi
+    if [ -n "${VERSION_ID:-}" ]; then
+        DEBIAN_MAJOR=$(echo "$VERSION_ID" | cut -d. -f1)
+    elif [ -f /etc/debian_version ]; then
+        DEBIAN_MAJOR=$(cat /etc/debian_version | cut -d. -f1)
+    else
+        DEBIAN_MAJOR="unknown"
+    fi
+    if ! echo "$DEBIAN_MAJOR" | grep -qE '^[0-9]+$'; then
+        printf "\n"
+        box_start "$DIM$RED"
+        box_empty
+        box_line "Unable to detect Debian major version." center
+        box_line "Please run this script on Debian 12+ VPS." center
+        box_empty
+        box_end
+        printf "\n"
+        exit 1
+    fi
+    if [ "$DEBIAN_MAJOR" -lt 12 ]; then
+        printf "\n"
+        box_start "$DIM$RED"
+        box_empty
+        box_line "Detected: Debian $DEBIAN_MAJOR" center
+        box_line "Required: Debian 12+ (Bookworm or newer)" center
+        box_line "Please upgrade and run again." center
+        box_empty
+        box_end
+        printf "\n"
+        exit 1
+    fi
 }
 
-# ASCII Header
-printf "\n"
-printf "%s┌───────────────────────────────────────────────────────────────┐%s\n" "$DIM$RED" "$RESET"
-printf "%s│%s                                                               %s│%s\n" "$DIM$RED" "$RESET" "$DIM$RED" "$RESET"
-printf "%s│%s                        %sstart-tunnel%s                           %s│%s\n" "$DIM$RED" "$RESET" "$WHITE$BOLD" "$RESET" "$DIM$RED" "$RESET"
-printf "%s│%s                                                               %s│%s\n" "$DIM$RED" "$RESET" "$DIM$RED" "$RESET"
-printf "%s│%s               %sSelf-Hosted WireGuard VPN Server%s                %s│%s\n" "$DIM$RED" "$RESET" "$DIM" "$RESET" "$DIM$RED" "$RESET"
-printf "%s│%s             %sOptimized for reverse tunneling access%s            %s│%s\n" "$DIM$RED" "$RESET" "$DIM" "$RESET" "$DIM$RED" "$RESET"
-printf "%s│%s                                                               %s│%s\n" "$DIM$RED" "$RESET" "$DIM$RED" "$RESET"
-printf "%s└───────────────────────────────────────────────────────────────┘%s\n" "$DIM$RED" "$RESET"
-printf "\n"
+ascii_banner() {
+    printf "\n"
+    box_start "$DIM$RED"
+    box_empty
+    box_line "start-tunnel" "center" "$WHITE$BOLD"
+    box_empty
+    box_line "Self-Hosted WireGuard VPN Server" "center" "$DIM"
+    box_line "Optimized for reverse tunneling access" "center" "$DIM"
+    box_empty
+    box_end
+    printf "\n"
+}
 
-err() { printf "%sError:%s %s\n" "$RED$BOLD" "$RESET" "$1" >&2; exit 1; }
+ensure_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        if ! command -v sudo >/dev/null 2>&1; then
+            err "This script requires root privileges but sudo is not available"
+        fi
+        TEMP_SCRIPT=$(mktemp /tmp/start-tunnel-installer.XXXXXX.sh)
+        trap 'rm -f "$TEMP_SCRIPT"' EXIT INT TERM
+        if [ ! -t 0 ] || [ "$0" = "sh" ] || [ "$0" = "bash" ]; then
+            cat - > "$TEMP_SCRIPT"
+        else
+            cp "$0" "$TEMP_SCRIPT"
+        fi
+        chmod +x "$TEMP_SCRIPT"
+        printf "\n"
+        box_start "$DIM$YELLOW"
+        box_empty
+        box_line "Root privileges required. Re-running with sudo." center
+        box_empty
+        box_end
+        printf "\n"
+        exec sudo sh "$TEMP_SCRIPT" "$@"
+        exit 1
+    fi
+}
 
-# Configuration
+# Installer configuration
 VERSION="0.4.0-alpha.14"
 BASE_URL="https://github.com/Start9Labs/start-os/releases/download/v${VERSION}"
 PACKAGE_PREFIX="start-tunnel-${VERSION}-66188d7.dev"
@@ -103,7 +177,6 @@ PACKAGE_NAME_BASE="start-tunnel"
 SERVICE_NAME="start-tunneld.service"
 MIN_DEBIAN_VERSION=12
 
-# Global variables
 REINSTALL_MODE=false
 FRESH_INSTALL=true
 INSTALLED_VERSION=""
@@ -112,117 +185,17 @@ SERVICE_WAS_ENABLED=false
 DNS_FIXED=false
 CONFIGURE_WEB_UI=false
 
-# Verify this is a Debian system
-check_debian() {
-    OS_TYPE=$(uname -s 2>/dev/null)
-    if [ "$OS_TYPE" != "Linux" ]; then
-        printf "\n"
-        box_start "$DIM$RED"
-        box_empty
-        box_line "StartTunnel requires a Debian-based Linux system."
-        box_empty
-        box_line "Detected: $OS_TYPE"
-        box_line "Required: Debian 12+ (Bookworm or newer)"
-        box_empty
-        box_end
-        printf "\n"
-        exit 1
-    fi
-    
-    if [ ! -f /etc/os-release ]; then
-        printf "\n"
-        box_start "$DIM$RED"
-        box_empty
-        box_line "StartTunnel requires Debian 12+ (Bookworm or newer)."
-        box_empty
-        box_line "Your system does not appear to be a Debian-based distro."
-        box_empty
-        box_end
-        printf "\n"
-        exit 1
-    fi
-    
-    . /etc/os-release
-    
-    if ! echo "$ID" | grep -qE '^(debian|ubuntu|raspbian)$' && ! echo "${ID_LIKE:-}" | grep -q debian; then
-        printf "\n"
-        box_start "$DIM$RED"
-        box_empty
-        box_line "StartTunnel requires Debian 12+ (Bookworm or newer)."
-        box_empty
-        box_line "Detected: $NAME"
-        box_line "Required: Debian, Ubuntu, or Raspbian"
-        box_empty
-        box_end
-        printf "\n"
-        exit 1
-    fi
-    
-    if [ "$ID" = "debian" ]; then
-        if [ -n "${VERSION_ID:-}" ]; then
-            DEBIAN_MAJOR=$(echo "$VERSION_ID" | cut -d. -f1)
-        elif [ -f /etc/debian_version ]; then
-            DEBIAN_MAJOR=$(cat /etc/debian_version | cut -d. -f1)
-        else
-            DEBIAN_MAJOR="unknown"
-        fi
-        
-        if echo "$DEBIAN_MAJOR" | grep -qE '^[0-9]+$'; then
-            if [ "$DEBIAN_MAJOR" -lt "$MIN_DEBIAN_VERSION" ]; then
-                printf "\n"
-                box_start "$DIM$RED"
-                box_empty
-                box_line "StartTunnel requires Debian 12 (Bookworm) or newer."
-                box_empty
-                box_line "Detected: Debian $DEBIAN_MAJOR"
-                box_line "Required: Debian 12 or higher"
-                box_empty
-                box_end
-                printf "\n"
-                exit 1
-            fi
-        fi
-    fi
-}
-
-ensure_root() {
-    if [ "$(id -u)" -ne 0 ]; then
-        if ! command -v sudo >/dev/null 2>&1; then
-            err "This script requires root privileges but sudo is not available"
-        fi
-
-        # For piped execution (curl | sh), $0 is not the script file.
-        # We must re-download the script and pipe it to a new shell with sudo.
-        # The URL is hardcoded here to make this possible.
-        SCRIPT_URL="http://start9labs.github.io/wireguard-vps-proxy-setup"
-
-        printf "\n"
-        box_start "$DIM$YELLOW"
-        box_empty
-        box_line "This script requires root privileges."
-        box_line "Please enter your password for sudo to continue."
-        box_empty
-        box_end
-        printf "\n"
-
-        exec sudo sh -c "$(curl -sSL $SCRIPT_URL)" -- "$@"
-    fi
-}
-
 check_install_packages() {
     REQUIRED_PACKAGES="curl wireguard-tools"
     MISSING_PACKAGES=""
-    
     for pkg in $REQUIRED_PACKAGES; do
         if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
             MISSING_PACKAGES="$MISSING_PACKAGES $pkg"
         fi
     done
-    
     if [ -n "$MISSING_PACKAGES" ]; then
         printf "Installing required packages:%s\n" "$MISSING_PACKAGES"
         apt-get update -qq 2>/dev/null || true
-        
         if ! apt-get install -y $MISSING_PACKAGES >/dev/null 2>&1; then
             err "Failed to install required packages:$MISSING_PACKAGES"
         fi
@@ -231,23 +204,18 @@ check_install_packages() {
 
 check_ip_forwarding() {
     IPV4_FORWARD=$(sysctl -n net.ipv4.ip_forward 2>/dev/null || echo "0")
-    
     if [ "$IPV4_FORWARD" != "1" ]; then
         printf "\n"
         box_start "$DIM$YELLOW"
         box_empty
-        box_line "IP forwarding is required for StartTunnel to route traffic."
+        box_line "IP forwarding required for StartTunnel."
         box_line "Enabling IP forwarding (IPv4 and IPv6)..."
         box_empty
         box_end
-        
         sysctl -w net.ipv4.ip_forward=1 >/dev/null 2>&1 || true
         sysctl -w net.ipv6.conf.all.forwarding=1 >/dev/null 2>&1 || true
-        
         if ! grep -q "^net.ipv4.ip_forward" /etc/sysctl.conf 2>/dev/null; then
             cat >> /etc/sysctl.conf << 'EOF'
-
-# StartTunnel IP forwarding configuration
 net.ipv4.ip_forward=1
 net.ipv6.conf.all.forwarding=1
 EOF
@@ -259,7 +227,6 @@ EOF
                 sed -i 's/^#*net.ipv6.conf.all.forwarding.*/net.ipv6.conf.all.forwarding=1/' /etc/sysctl.conf
             fi
         fi
-        
         sysctl -p >/dev/null 2>&1 || true
         printf "IP forwarding enabled\n"
     fi
@@ -272,14 +239,11 @@ check_dns() {
         box_empty
         box_line "Cannot resolve github.com. Checking connectivity..."
         box_end
-        
         if ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1 || ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
             printf "Fixing DNS configuration...\n"
-            
             if [ -f /etc/resolv.conf ]; then
                 cp /etc/resolv.conf /etc/resolv.conf.backup 2>/dev/null || true
             fi
-            
             cat > /etc/resolv.conf << 'EOF'
 # Generated by StartTunnel installer
 # Google DNS
@@ -290,20 +254,16 @@ nameserver 1.1.1.1
 nameserver 1.0.0.1
 # Quad9 DNS
 nameserver 9.9.9.9
-
 options timeout:2 attempts:3 rotate
 EOF
-            
             DNS_FIXED=true
-            
             if ! ping -c 1 -W 2 github.com >/dev/null 2>&1; then
                 err "DNS configuration failed. Please check network connectivity"
             fi
-            
             printf "\n"
             box_start "$DIM$GREEN"
             box_empty
-            box_line "DNS has been configured with public resolvers."
+            box_line "DNS configured with public resolvers."
             box_line "Backup saved to: /etc/resolv.conf.backup"
             box_empty
             box_end
@@ -433,7 +393,7 @@ display_web_info() {
     printf "\n"
     box_start "$DIM$BLUE"
     box_empty
-    box_line "Displaying current web interface configuration..."
+    box_line "Displaying current web interface configuration..." "center"
     box_empty
     box_end
     printf "\n"
@@ -449,7 +409,7 @@ reconfigure_web_ui() {
     printf "\n"
     box_start "$DIM$BLUE"
     box_empty
-    box_line "This will reset and reinitialize the web interface."
+    box_line "This will reset and reinitialize the web interface." "center"
     box_empty
     box_line "Options:"
     box_line "  [i] Display current web information"
@@ -491,12 +451,11 @@ check_existing_installation() {
         printf "\n"
         box_start "$DIM$BLUE"
         box_empty
-        box_line "StartTunnel $INSTALLED_VERSION is already installed."
-        
+        box_line "StartTunnel $INSTALLED_VERSION is already installed." "center"
         if [ "$SERVICE_WAS_RUNNING" = true ]; then
-            box_line "Service is currently running."
+            box_line "Service is currently running." "center"
         else
-            box_line "Service is not running."
+            box_line "Service is not running." "center"
         fi
         
         box_empty
@@ -530,23 +489,11 @@ check_existing_installation() {
 
 detect_architecture() {
     MACHINE_ARCH=$(uname -m)
-    
     case "$MACHINE_ARCH" in
-        x86_64)
-            ARCH="x86_64"
-            DISPLAY_ARCH="Intel/AMD64"
-            ;;
-        aarch64)
-            ARCH="aarch64"
-            DISPLAY_ARCH="ARM64"
-            ;;
-        riscv64)
-            ARCH="riscv64"
-            DISPLAY_ARCH="RISC-V 64"
-            ;;
-        *)
-            err "Unsupported architecture: $MACHINE_ARCH"
-            ;;
+        x86_64) ARCH="x86_64"; DISPLAY_ARCH="Intel/AMD64";;
+        aarch64) ARCH="aarch64"; DISPLAY_ARCH="ARM64";;
+        riscv64) ARCH="riscv64"; DISPLAY_ARCH="RISC-V 64";;
+        *) err "Unsupported architecture: $MACHINE_ARCH";;
     esac
 }
 
@@ -555,7 +502,7 @@ download_package() {
     DOWNLOAD_URL="${BASE_URL}/${PACKAGE_NAME}"
     TEMP_DIR=$(mktemp -d)
     PACKAGE_PATH="${TEMP_DIR}/${PACKAGE_NAME}"
-    
+
     printf "Downloading StartTunnel...\n"
     
     if command -v curl >/dev/null 2>&1; then
@@ -618,8 +565,8 @@ configure_web_ui() {
     printf "\n"
     box_start "$DIM$BLUE"
     box_empty
-    box_line "StartTunnel includes a web interface for easy management."
-    box_line "Would you like to initialize it now? (Recommended)"
+    box_line "StartTunnel includes a web interface for easy management." "center"
+    box_line "Would you like to initialize it now? (Recommended)" "center"
     box_empty
     box_line "[y] Yes, initialize web UI"
     box_line "[n] No, configure later"
@@ -663,6 +610,7 @@ configure_web_ui() {
 main() {
     fix_stdin
     check_debian
+    ascii_banner
     ensure_root
     check_existing_installation
     
@@ -674,26 +622,21 @@ main() {
     check_ip_forwarding
     check_dns
     check_disable_firewall
-    
     detect_architecture
     download_package
     install_package
     verify_installation
-    
-    # Handle service state
+
     if [ "$REINSTALL_MODE" = true ]; then
         restart_service
     else
-        # Fresh install - enable and start service automatically
         enable_and_start_service
     fi
-    
-    # Configure web UI
+
     if [ "$FRESH_INSTALL" = true ] || [ "$REINSTALL_MODE" = true ]; then
         configure_web_ui
     fi
-    
-    # Success message
+
     printf "\n"
     box_start "$DIM$GREEN"
     box_empty
