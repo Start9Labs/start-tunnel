@@ -39,7 +39,7 @@ box_line() {
     text_style="${3:-}"
     text_len=$(printf "%s" "$text" | wc -m | tr -d ' ')
     if printf "%s" "$text" | grep -q "[✓✗●○◆◇★☆]"; then
-        text_len=$((text_len - 2))
+        text_len=$((text_len))
     fi
     if [ "$align" = "center" ]; then
         left_pad=$(( (61 - text_len) / 2 ))
