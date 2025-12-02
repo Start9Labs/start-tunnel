@@ -2,43 +2,65 @@
   <img src="icon.png" alt="Project Logo" width="21%">
 </p>
 
-# StartOS WireGuard VPS Setup Tool
+# Start Tunnel Setup Script
 
-This repository contains the VPS configuration script used by the `wg-vps-setup` command in StartOS 3.6+. While the script can be used standalone to manually configure a VPS for StartOS, the recommended method is using the built-in `wg-vps-setup` command on your StartOS system.
+This repository contains the installer script for StartTunnel, a self-hosted WireGuard VPN server optimized for reverse tunneling access. The script provides a complete, turnkey installation on Debian-based VPS systems.
 
-## For StartOS Users
+## Quick Install
 
-Simply use the built-in command:
+The easiest way to install StartTunnel on your VPS:
 
 ```bash
-wg-vps-setup -i YOUR_VPS_IP
+curl -sSL https://start9labs.github.io/start-tunnel | sh
 ```
 
-### Usage Options
+This one-line command will:
+- Validate your system (Debian 12+ required)
+- Configure networking (DNS, firewall)
+- Download and install StartTunnel
+- Automatically start and enable the service
+- Optionally configure the web interface
+
+## Alternative Installation Methods
+
+### Download and Execute
 
 ```bash
--i    VPS IP address
--u    SSH username (default: root)
--p    SSH port (default: 22)
--k    Path to custom SSH private key
--h    Show help message
+curl -fsSL https://start9labs.github.io/start-tunnel -o install.sh
+chmod +x install.sh
+./install.sh
 ```
 
-## Manual VPS Configuration
+### Manual Script Execution
 
-If you need to manually configure a VPS for StartOS use:
+If you've cloned this repository:
 
 ```bash
-curl -OL https://raw.githubusercontent.com/start9labs/wg-vps-setup/master/wireguard-install.sh
-chmod +x wireguard-install.sh
-./wireguard-install.sh
+chmod +x start-tunnel-setup.sh
+sudo ./start-tunnel-setup.sh
 ```
 
 ## Requirements
 
-- Fresh VPS with root access
-- StartOS 3.6+ for automated setup
-- Basic networking knowledge
+- **Operating System:** Debian 12+ (Bookworm or newer)
+- **Architecture:** x86_64, aarch64, or riscv64
+- **Access:** Root privileges (script will auto-escalate with sudo if needed)
+- **Network:** Internet connectivity for package downloads
+
+## Features
+
+- ✅ Automatic system validation and preparation
+- ✅ DNS configuration (if needed)
+- ✅ Firewall management (disables system firewalls, StartTunnel manages its own)
+- ✅ IP forwarding (handled automatically by the deb package)
+- ✅ Service auto-start and enable on boot
+- ✅ Interactive web interface setup
+- ✅ Support for fresh installs and reinstalls
+- ✅ Clean, color-coded terminal interface
+
+## Documentation
+
+For detailed documentation about the installer's logic, functionality, and system impact, see [INSTALL.md](INSTALL.md).
 
 ## Contributing
 

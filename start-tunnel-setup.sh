@@ -202,36 +202,6 @@ check_install_packages() {
     fi
 }
 
-check_ip_forwarding() {
-    IPV4_FORWARD=$(sysctl -n net.ipv4.ip_forward 2>/dev/null || echo "0")
-    if [ "$IPV4_FORWARD" != "1" ]; then
-        printf "\n"
-        box_start "$DIM$YELLOW"
-        box_empty
-        box_line "IP forwarding required for StartTunnel."
-        box_line "Enabling IP forwarding (IPv4 and IPv6)..."
-        box_empty
-        box_end
-        sysctl -w net.ipv4.ip_forward=1 >/dev/null 2>&1 || true
-        sysctl -w net.ipv6.conf.all.forwarding=1 >/dev/null 2>&1 || true
-        if ! grep -q "^net.ipv4.ip_forward" /etc/sysctl.conf 2>/dev/null; then
-            cat >> /etc/sysctl.conf << 'EOF'
-net.ipv4.ip_forward=1
-net.ipv6.conf.all.forwarding=1
-EOF
-        else
-            sed -i 's/^#*net.ipv4.ip_forward.*/net.ipv4.ip_forward=1/' /etc/sysctl.conf
-            if ! grep -q "^net.ipv6.conf.all.forwarding" /etc/sysctl.conf 2>/dev/null; then
-                echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.conf
-            else
-                sed -i 's/^#*net.ipv6.conf.all.forwarding.*/net.ipv6.conf.all.forwarding=1/' /etc/sysctl.conf
-            fi
-        fi
-        sysctl -p >/dev/null 2>&1 || true
-        printf "IP forwarding enabled\n"
-    fi
-}
-
 check_dns() {
     if ! ping -c 1 -W 2 github.com >/dev/null 2>&1; then
         printf "\n"
@@ -619,7 +589,6 @@ main() {
     fi
     
     check_install_packages
-    check_ip_forwarding
     check_dns
     check_disable_firewall
     detect_architecture

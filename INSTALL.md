@@ -8,7 +8,7 @@ This script performs a **complete, turnkey installation** of StartTunnel on a De
 
 **What it does:**
 - Validates Debian 12+ system
-- Configures networking (IP forwarding, DNS, firewall)
+- Configures networking (DNS, firewall)
 - Installs WireGuard and StartTunnel
 - Automatically enables and starts the service
 - Configures web interface (optional)
@@ -116,12 +116,10 @@ Supported symbols (one per line for proper alignment):
 │             (Fresh Install or Reinstall)                    │
 ├─────────────────────────────────────────────────────────────┤
 │ 1. Install required packages (curl, wireguard-tools)        │
-│ 2. Check and enable IP forwarding (IPv4 & IPv6)             │
-│    └─> Yellow box if needs enabling                         │
-│ 3. Check and fix DNS resolution                             │
+│ 2. Check and fix DNS resolution                             │
 │    ├─> Yellow box if issue detected                         │
 │    └─> Green box when fixed                                 │
-│ 4. Detect and disable system firewalls                      │
+│ 3. Detect and disable system firewalls                      │
 │    └─> Yellow box for UFW/iptables removal                  │
 └────────────────────────┬────────────────────────────────────┘
                          │
@@ -341,26 +339,6 @@ box_end
 
 ---
 
-#### `check_ip_forwarding()`
-**Purpose:** Enables IP forwarding for VPN routing
-**Flow:**
-1. Check current IPv4 forwarding status
-2. If disabled:
-   - Display yellow box: "IP forwarding required..."
-   - Enable IPv4 forwarding immediately
-   - Enable IPv6 forwarding immediately
-   - Make persistent in /etc/sysctl.conf
-   - Apply changes with `sysctl -p`
-   - Report "IP forwarding enabled"
-
-**System Files Modified:**
-- /etc/sysctl.conf (appends or updates)
-
-**Settings Added:**
-```
-net.ipv4.ip_forward=1
-net.ipv6.conf.all.forwarding=1
-```
 
 ---
 
@@ -692,7 +670,6 @@ Mode: EXISTING (from [c] option)
 
 | Path | Action | Purpose |
 |------|--------|---------|
-| `/etc/sysctl.conf` | Appended | Enable IP forwarding (IPv4 & IPv6) |
 | `/etc/resolv.conf` | Created/Modified | Configure DNS servers |
 | `/etc/resolv.conf.backup` | Created | Backup before DNS changes |
 
@@ -712,7 +689,6 @@ Mode: EXISTING (from [c] option)
 - wireguard-tools
 
 **Network Configuration:**
-- IP forwarding: ✓ Enabled (persistent)
 - DNS: ✓ Configured (if needed)
 - Firewall: ✓ Disabled (StartTunnel manages own rules)
 
@@ -731,7 +707,6 @@ curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
 2. ✓ Escalate to root via sudo (if needed)
 3. ✓ Fresh install detected
 4. ✓ System preparation:
-   - Yellow box: IP forwarding enabled (if needed)
    - Yellow box: DNS fixed (if needed)
    - Yellow box: Firewall disabled (if detected)
 5. ✓ Download with grey progress bar
@@ -895,9 +870,6 @@ start-tunnel web init
 # Check DNS resolution
 ping github.com
 
-# Check IP forwarding
-sysctl net.ipv4.ip_forward
-sysctl net.ipv6.conf.all.forwarding
 
 # View firewall rules (managed by StartTunnel)
 iptables -L -n
