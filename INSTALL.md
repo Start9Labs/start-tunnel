@@ -17,10 +17,10 @@ This script performs a **complete, turnkey installation** of StartTunnel on a De
 **Installation Methods:**
 ```
 # Method 1: One-line curl install (recommended)
-curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
+curl -sSL http://start9labs.github.io/start-tunnel | sh
 
 # Method 2: Download and execute
-curl -fsSL http://start9labs.github.io/wireguard-vps-proxy-setup -o install.sh
+curl -fsSL http://start9labs.github.io/start-tunnel -o install.sh
 chmod +x install.sh
 ./install.sh
 ```
@@ -419,7 +419,7 @@ box_end
 
 **Example URL:**
 ```
-https://github.com/Start9Labs/start-os/releases/download/v0.4.0-alpha.12/start-tunnel-0.4.0-alpha.12-unknown.dev_x86_64.deb
+https://github.com/Start9Labs/start-os/releases/download/v0.4.0-alpha.15/start-tunnel-0.4.0-alpha.15-unknown.dev_x86_64.deb
 ```
 
 **Exit Conditions:**
@@ -699,7 +699,7 @@ Mode: EXISTING (from [c] option)
 ### Scenario 1: Fresh Debian 12 VPS
 **Command:**
 ```
-curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
+curl -sSL http://start9labs.github.io/start-tunnel | sh
 ```
 
 **Expected Flow:**
@@ -724,12 +724,12 @@ curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
 ### Scenario 2: Reinstall on Existing Installation
 **Command:**
 ```
-curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
+curl -sSL http://start9labs.github.io/start-tunnel | sh
 ```
 
 **Expected Flow:**
 1. ✓ OS checks pass
-2. ✓ Blue box: Existing v0.4.0-alpha.12 detected
+2. ✓ Blue box: Existing v0.4.0-alpha.15 detected
    - Shows service status
    - Options: [r/c/n]
 3. User chooses 'r':
@@ -753,7 +753,7 @@ curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
 ### Scenario 3: Non-Debian System
 **Command:**
 ```
-curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
+curl -sSL http://start9labs.github.io/start-tunnel | sh
 ```
 
 **Expected Flow:**
@@ -770,7 +770,7 @@ curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
 ### Scenario 4: Piped from curl (stdin fix test)
 **Command:**
 ```
-curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
+curl -sSL http://start9labs.github.io/start-tunnel | sh
 ```
 
 **Expected Behavior:**
@@ -879,7 +879,7 @@ iptables -L -n
 
 ## 📝 Version Information
 
-- **Script Version:** Based on StartTunnel 0.4.0-alpha.12
+- **Script Version:** Based on StartTunnel 0.4.0-alpha.15
 - **Compatible Systems:** Debian 12+, Ubuntu (Debian-based), Raspbian
 - **Supported Architectures:** x86_64, aarch64, riscv64
 - **Installation Methods:** 
