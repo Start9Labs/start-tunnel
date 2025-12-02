@@ -172,7 +172,7 @@ ensure_root() {
 # Installer configuration
 VERSION="0.4.0-alpha.15"
 BASE_URL="https://github.com/Start9Labs/start-os/releases/download/v${VERSION}"
-PACKAGE_PREFIX="start-tunnel-${VERSION}-24eb27f.dev"
+PACKAGE_PREFIX="start-tunnel-${VERSION}-a53b15f.dev"
 PACKAGE_NAME_BASE="start-tunnel"
 SERVICE_NAME="start-tunneld.service"
 MIN_DEBIAN_VERSION=12
