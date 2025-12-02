@@ -182,6 +182,7 @@ FRESH_INSTALL=true
 INSTALLED_VERSION=""
 SERVICE_WAS_RUNNING=false
 SERVICE_WAS_ENABLED=false
+SERVICE_IS_RUNNING=false
 DNS_FIXED=false
 CONFIGURE_WEB_UI=false
 
@@ -315,13 +316,32 @@ restart_service() {
         
         if systemctl start "$SERVICE_NAME" 2>/dev/null; then
             sleep 2
-            if ! systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+            if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+                SERVICE_IS_RUNNING=true
+                printf "Service restarted successfully\n"
+            else
+                SERVICE_IS_RUNNING=false
                 printf "\n%sWarning:%s Service restarted but may have issues.\n" "$YELLOW$BOLD" "$RESET"
                 printf "         Check status: %ssystemctl status %s%s\n" "$DIM" "$SERVICE_NAME" "$RESET"
             fi
         else
+            SERVICE_IS_RUNNING=false
             printf "\n%sWarning:%s Could not restart service.\n" "$YELLOW$BOLD" "$RESET"
             printf "         Manual start needed: %ssystemctl start %s%s\n" "$DIM" "$SERVICE_NAME" "$RESET"
+        fi
+    else
+        # Service wasn't running before, try to start it anyway
+        systemctl daemon-reload 2>/dev/null || true
+        if systemctl start "$SERVICE_NAME" 2>/dev/null; then
+            sleep 2
+            if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+                SERVICE_IS_RUNNING=true
+                printf "Service started successfully\n"
+            else
+                SERVICE_IS_RUNNING=false
+            fi
+        else
+            SERVICE_IS_RUNNING=false
         fi
     fi
     
@@ -348,12 +368,15 @@ enable_and_start_service() {
     if systemctl start "$SERVICE_NAME" 2>/dev/null; then
         sleep 2
         if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+            SERVICE_IS_RUNNING=true
             printf "Service started successfully\n"
         else
+            SERVICE_IS_RUNNING=false
             printf "%sWarning:%s Service may not be running properly\n" "$YELLOW$BOLD" "$RESET"
             printf "         Check status: %ssystemctl status %s%s\n" "$DIM" "$SERVICE_NAME" "$RESET"
         fi
     else
+        SERVICE_IS_RUNNING=false
         printf "%sWarning:%s Could not start service\n" "$YELLOW$BOLD" "$RESET"
         printf "         Manual start: %ssystemctl start %s%s\n" "$DIM" "$SERVICE_NAME" "$RESET"
     fi
@@ -532,6 +555,25 @@ verify_installation() {
 }
 
 configure_web_ui() {
+    # Reload systemd daemon and check if service is running before attempting web UI configuration
+    systemctl daemon-reload 2>/dev/null || true
+    if ! systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        printf "\n"
+        box_start "$DIM$YELLOW"
+        box_empty
+        box_line "Service is not running. Web interface cannot be configured." "center" "$BOLD"
+        box_empty
+        box_line "Please start the service first:" "center"
+        box_line "  systemctl start $SERVICE_NAME" "center" "$DIM"
+        box_line "  systemctl status $SERVICE_NAME" "center" "$DIM"
+        box_empty
+        box_line "Then run: start-tunnel web init" "center"
+        box_empty
+        box_end
+        printf "\n"
+        return
+    fi
+    
     printf "\n"
     box_start "$DIM$BLUE"
     box_empty
@@ -549,6 +591,15 @@ configure_web_ui() {
     case "$WEB_RESPONSE" in
         [yY]|[yY][eE][sS])
             printf "\n"
+            
+            # Reload systemd and verify service is still running before configuring
+            systemctl daemon-reload 2>/dev/null || true
+            if ! systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+                printf "%sError:%s Service is not running. Cannot configure web interface.\n" "$RED$BOLD" "$RESET"
+                printf "         Please start the service: %ssystemctl start %s%s\n" "$DIM" "$SERVICE_NAME" "$RESET"
+                printf "         Then run: %sstart-tunnel web init%s\n" "$DIM" "$RESET"
+                return
+            fi
             
             if [ "$REINSTALL_MODE" = true ]; then
                 printf "Resetting web interface...\n"
@@ -609,7 +660,12 @@ main() {
     printf "\n"
     box_start "$DIM$GREEN"
     box_empty
-    box_line "✓ Installation Complete" "center" "$GREEN$BOLD"
+    box_line "Installation Complete" "center" "$GREEN$BOLD"
+    if [ "$SERVICE_IS_RUNNING" = false ]; then
+        box_empty
+        box_line "Note: Service is not running. Please check:" "center" "$YELLOW"
+        box_line "  systemctl status $SERVICE_NAME" "center" "$DIM"
+    fi
     box_empty
     box_end
     printf "\n"
