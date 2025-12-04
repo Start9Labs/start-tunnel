@@ -19,7 +19,8 @@ This one-line command will:
 - Configure networking (DNS, firewall)
 - Download and install StartTunnel
 - Automatically start and enable the service
-- Optionally configure the web interface
+- Show instructions to initialize the web interface (fresh installs)
+- Auto-display web interface info on reinstall
 
 ## Alternative Installation Methods
 
@@ -54,7 +55,8 @@ sudo ./start-tunnel-setup.sh
 - ✅ Firewall management (disables system firewalls, StartTunnel manages its own)
 - ✅ IP forwarding (handled automatically by the deb package)
 - ✅ Service auto-start and enable on boot
-- ✅ Interactive web interface setup
+- ✅ Clear instructions for web interface setup (fresh installs)
+- ✅ Auto-display web interface info on reinstall
 - ✅ Support for fresh installs and reinstalls
 - ✅ Clean, color-coded terminal interface
 

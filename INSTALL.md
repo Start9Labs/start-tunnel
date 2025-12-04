@@ -11,16 +11,17 @@ This script performs a **complete, turnkey installation** of StartTunnel on a De
 - Configures networking (DNS, firewall)
 - Installs WireGuard and StartTunnel
 - Automatically enables and starts the service
-- Configures web interface (optional)
+- Shows web interface setup instructions (fresh installs)
+- Auto-displays web interface info on reinstall
 - Handles both fresh installs and reinstalls seamlessly
 
 **Installation Methods:**
 ```
 # Method 1: One-line curl install (recommended)
-curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
+curl -sSL http://start9labs.github.io/start-tunnel  | sh
 
 # Method 2: Download and execute
-curl -fsSL http://start9labs.github.io/wireguard-vps-proxy-setup -o install.sh
+curl -fsSL http://start9labs.github.io/start-tunnel  -o install.sh
 chmod +x install.sh
 ./install.sh
 ```
@@ -154,7 +155,7 @@ Supported symbols (one per line for proper alignment):
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│            WEB INTERFACE CONFIGURATION                      │
+│                    COMPLETION                                │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │ ┌──────────────────┐              ┌────────────────────┐    │
@@ -162,22 +163,12 @@ Supported symbols (one per line for proper alignment):
 │ └────────┬─────────┘              └─────────┬──────────┘    │
 │          │                                  │               │
 │          ▼                                  ▼               │
-│   Blue Box:                          Blue Box:              │
-│   Configure? (Recommended)           Reconfigure?           │
-│   [y] Yes                            [y] Yes                │
-│   [n] No                             [n] No                 │
-│          │                                   │              │
-│   ┌──────┴──────┐                     ┌──────┴──────┐       │
-│   │             │                     │             │       │
-│   ▼             ▼                     ▼             ▼       │
-│  Yes           No                    Yes           No       │
-│   │             │                     │             │       │
-│   │             └──> Skip             │             └──>    │
-│   │                                   │              Keep   │
-│   │                                   │             Existing│
-│   ▼                                   ▼                     │
-│ Run:                           1. start-tunnel web reset    │
-│ start-tunnel web init          2. start-tunnel web init     │
+│   Green Box:                         Auto-run:              │
+│   "Installation Complete"            start-tunnel web init  │
+│   - Service status (if not running)  (if service running)   │
+│   - Instruction: "To initialize      - Shows web UI info     │
+│     the web interface, run:"         (URL, SSL cert, etc.)  │
+│   - Command: start-tunnel web init                          │
 │                                                             │
 └────────────────────────┬────────────────────────────────────┘
                          │
@@ -493,37 +484,22 @@ https://github.com/Start9Labs/start-os/releases/download/v0.4.0-alpha.12/start-t
 
 ---
 
-### **Phase 6: Web Interface Configuration**
+### **Phase 6: Completion**
 
-#### `configure_web_ui()`
-**Purpose:** Interactive web UI setup with mode-aware prompts
-**Flow:**
-
-**Prerequisites:**
-- Service MUST be running (auto-started in fresh installs)
+**Note:** The installer no longer prompts for web UI configuration. Instead:
 
 **For Fresh Install:**
-1. Display blue box:
-   - "StartTunnel includes a web interface for easy management."
-   - "Would you like to initialize it now? (Recommended)"
-   - "[y] Yes, initialize web UI"
-   - "[n] No, configure later"
-2. If Yes: Run `start-tunnel web init` (interactive password prompt)
-3. If No: Skip with grey text showing manual command
+- Shows success message with instruction to run `start-tunnel web init`
+- User manually runs the command to initialize web interface
 
 **For Reinstall:**
-1. Display blue box (same design):
-   - Options tailored for reinstall scenario
-2. If Yes:
-   - Display "Resetting web interface..."
-   - Run `start-tunnel web reset` (silent, wipes config)
-   - Display "Initializing web interface..."
-   - Run `start-tunnel web init` (interactive)
-3. If No: Keep existing configuration
+- Automatically runs `start-tunnel web init` if service is running
+- Displays web interface information (URL, SSL certificate, etc.)
+- No success message box shown
 
-**Interactive Commands:**
-- `start-tunnel web init` - Prompts for password, generates SSL cert
-- `start-tunnel web reset` - Silently wipes all web config
+**Commands:**
+- `start-tunnel web init` - Initializes web interface (prompts for password on first run, shows info if already configured)
+- `start-tunnel web reset` - Resets web interface configuration
 
 ---
 
@@ -542,24 +518,35 @@ https://github.com/Start9Labs/start-os/releases/download/v0.4.0-alpha.12/start-t
 
 ---
 
-### **Phase 7: Completion**
-
 #### Success Display
 **Purpose:** Show completion message and clean up
 **Flow:**
+
+**For Fresh Install:**
 1. Display green box (centered):
    ```
    ┌───────────────────────────────────────────────────────────────┐
    │                                                               │
-   │                  ✓ Installation Complete                      │
+   │                  Installation Complete                        │
+   │                                                               │
+   │   To initialize the web interface, run:                       │
+   │   start-tunnel web init                                       │
    │                                                               │
    └───────────────────────────────────────────────────────────────┘
    ```
-2. Close TTY redirection: `exec 0<&- 2>/dev/null || true`
-3. Script exits cleanly
-4. User returned to command prompt automatically
+2. Shows service status warning if service not running
+3. Close TTY redirection: `exec 0<&- 2>/dev/null || true`
+4. Script exits cleanly
+5. User returned to command prompt automatically
 
-**No Manual Steps Required:** Service is already running and enabled
+**For Reinstall:**
+1. Automatically runs `start-tunnel web init` (if service running)
+2. Displays web interface information directly
+3. No success message box shown
+4. Close TTY redirection: `exec 0<&- 2>/dev/null || true`
+5. Script exits cleanly
+
+**Manual Step Required (Fresh Install Only):** User must run `start-tunnel web init` to initialize web interface
 
 ---
 
@@ -616,19 +603,19 @@ Installation Mode?
        └─ systemctl enable (if was enabled)
 ```
 
-### Web Interface Configuration Decision
+### Completion Decision
 
 ```
 Mode: FRESH_INSTALL
-└─ Blue box: "Configure Web Interface now? [Y/n]"
-   ├─ Yes (default) → start-tunnel web init
-   └─ No → Skip (show manual command)
+└─ Green box: "Installation Complete"
+   └─ Shows instruction: "To initialize the web interface, run:"
+   └─ Shows command: "start-tunnel web init"
+   └─ User runs command manually
 
 Mode: REINSTALL_MODE
-└─ Blue box: "Would you like to initialize it now? [Y/n]"
-   ├─ Yes → start-tunnel web reset
-   │        → start-tunnel web init
-   └─ No → Skip (show manual command)
+└─ Automatically runs: start-tunnel web init (if service running)
+   └─ Displays web interface info (URL, SSL cert, etc.)
+   └─ No success message box shown
 
 Mode: EXISTING (from [c] option)
 └─ Blue box: "Options: [i/r/n]"
@@ -699,7 +686,7 @@ Mode: EXISTING (from [c] option)
 ### Scenario 1: Fresh Debian 12 VPS
 **Command:**
 ```
-curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
+curl -sSL http://start9labs.github.io/start-tunnel  | sh
 ```
 
 **Expected Flow:**
@@ -712,9 +699,10 @@ curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
 5. ✓ Download with grey progress bar
 6. ✓ Package installs
 7. ✓ Service automatically starts and enables
-8. ? Blue box: Web config prompt [Y/n]
-9. ✓ Green box: "✓ Installation Complete"
-10. ✓ Returns to command prompt automatically
+8. ✓ Green box: "Installation Complete"
+   - Shows instruction to run `start-tunnel web init`
+9. ✓ Returns to command prompt automatically
+10. User runs `start-tunnel web init` manually
 
 **Duration:** ~2-5 minutes  
 **No manual steps required**
@@ -724,7 +712,7 @@ curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
 ### Scenario 2: Reinstall on Existing Installation
 **Command:**
 ```
-curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
+curl -sSL http://start9labs.github.io/start-tunnel  | sh
 ```
 
 **Expected Flow:**
@@ -737,8 +725,8 @@ curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
    - ✓ System preparation
    - ✓ Package reinstalled
    - ✓ Service restarted (preserves previous state)
-   - ? Blue box: Web reconfig prompt [Y/n]
-   - ✓ Green box: "✓ Installation Complete"
+   - ✓ Automatically runs `start-tunnel web init` (if service running)
+   - ✓ Displays web interface info (URL, SSL cert, etc.)
    - ✓ Returns to prompt
 4. User chooses 'c':
    - ✓ Blue box: Web UI options [i/r/n]
@@ -753,7 +741,7 @@ curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
 ### Scenario 3: Non-Debian System
 **Command:**
 ```
-curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
+curl -sSL http://start9labs.github.io/start-tunnel  | sh
 ```
 
 **Expected Flow:**
@@ -770,7 +758,7 @@ curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
 ### Scenario 4: Piped from curl (stdin fix test)
 **Command:**
 ```
-curl -sSL http://start9labs.github.io/wireguard-vps-proxy-setup | sh
+curl -sSL http://start9labs.github.io/start-tunnel  | sh
 ```
 
 **Expected Behavior:**
