@@ -649,26 +649,33 @@ main() {
 
     if [ "$REINSTALL_MODE" = true ]; then
         restart_service
+        
+        # For reinstalls, automatically run web init if service is running
+        if [ "$SERVICE_IS_RUNNING" = true ] && command -v start-tunnel >/dev/null 2>&1; then
+            printf "\n"
+            start-tunnel web init
+        fi
     else
         enable_and_start_service
-    fi
-
-    if [ "$FRESH_INSTALL" = true ] || [ "$REINSTALL_MODE" = true ]; then
-        configure_web_ui
-    fi
-
-    printf "\n"
-    box_start "$DIM$GREEN"
-    box_empty
-    box_line "Installation Complete" "center" "$GREEN$BOLD"
-    if [ "$SERVICE_IS_RUNNING" = false ]; then
+        
+        # For fresh installs, show success message with instructions
+        printf "\n"
+        box_start "$DIM$GREEN"
         box_empty
-        box_line "Note: Service is not running. Please check:" "center" "$YELLOW"
-        box_line "  systemctl status $SERVICE_NAME" "center" "$DIM"
+        box_line "Installation Complete" "center" "$GREEN$BOLD"
+        box_empty
+        if [ "$SERVICE_IS_RUNNING" = false ]; then
+            box_line "Note: Service is not running. Please check:" "center" "$YELLOW"
+            box_line "  systemctl status $SERVICE_NAME" "center" "$DIM"
+            box_empty
+        fi
+        box_line "To initialize the web interface, run:" "center"
+        box_line "  start-tunnel web init" "center" "$BOLD"
+        box_empty
+        box_end
+        printf "\n"
     fi
-    box_empty
-    box_end
-    printf "\n"
+    
     # Close TTY redirection if it was opened
     exec 0<&- 2>/dev/null || true
 }
