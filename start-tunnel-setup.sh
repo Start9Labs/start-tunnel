@@ -170,12 +170,26 @@ ensure_root() {
 }
 
 # Installer configuration
-VERSION="0.4.0-alpha.15"
-BASE_URL="https://github.com/Start9Labs/start-os/releases/download/v${VERSION}"
-PACKAGE_PREFIX="start-tunnel-${VERSION}-a53b15f.dev"
 PACKAGE_NAME_BASE="start-tunnel"
 SERVICE_NAME="start-tunneld.service"
 MIN_DEBIAN_VERSION=12
+
+# Fetch latest version from GitHub releases
+fetch_latest_version() {
+    printf "%s•%s Fetching latest version info from GitHub...\n" "$YELLOW" "$RESET"
+    
+    LATEST_RELEASE_URL="https://api.github.com/repos/Start9Labs/start-tunnel/releases/latest"
+    
+    VERSION=$(curl -fsSL "$LATEST_RELEASE_URL" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/^v//')
+    
+    if [ -z "$VERSION" ]; then
+        err "Could not determine latest version from GitHub API."
+    fi
+    
+    printf "%s✓%s Found version: %s%s%s\n" "$GREEN" "$RESET" "$BOLD" "$VERSION" "$RESET"
+    
+    BASE_URL="https://github.com/Start9Labs/start-tunnel/releases/download/v${VERSION}"
+}
 
 REINSTALL_MODE=false
 FRESH_INSTALL=true
@@ -491,12 +505,39 @@ detect_architecture() {
 }
 
 download_package() {
-    PACKAGE_NAME="${PACKAGE_PREFIX}_${ARCH}.deb"
-    DOWNLOAD_URL="${BASE_URL}/${PACKAGE_NAME}"
     TEMP_DIR=$(mktemp -d)
+    
+    # Fetch release assets to find the correct package name
+    printf "%s•%s Finding package for architecture %s...\n" "$YELLOW" "$RESET" "$ARCH"
+    
+    ASSETS_URL="https://api.github.com/repos/Start9Labs/start-tunnel/releases/latest"
+    RELEASE_JSON=$(curl -fsSL "$ASSETS_URL" 2>/dev/null)
+    
+    if [ -z "$RELEASE_JSON" ]; then
+        rm -rf "$TEMP_DIR"
+        err "Could not fetch release information from GitHub API."
+    fi
+    
+    # Find the .deb package that matches our architecture
+    # Package names typically end with _${ARCH}.deb
+    PACKAGE_NAME=$(echo "$RELEASE_JSON" | grep -o '"name":\s*"[^"]*\.deb"' | sed -E 's/.*"([^"]+)".*/\1/' | grep "_${ARCH}\.deb$" | head -1)
+    
+    if [ -z "$PACKAGE_NAME" ]; then
+        # Fallback: try to construct package name
+        # Look for any start-tunnel package pattern
+        PACKAGE_NAME=$(echo "$RELEASE_JSON" | grep -o '"name":\s*"[^"]*start-tunnel[^"]*\.deb"' | sed -E 's/.*"([^"]+)".*/\1/' | grep "${ARCH}" | head -1)
+    fi
+    
+    if [ -z "$PACKAGE_NAME" ]; then
+        rm -rf "$TEMP_DIR"
+        err "Could not find package for architecture ${ARCH} in latest release."
+    fi
+    
+    DOWNLOAD_URL="${BASE_URL}/${PACKAGE_NAME}"
     PACKAGE_PATH="${TEMP_DIR}/${PACKAGE_NAME}"
 
-    printf "Downloading StartTunnel...\n"
+    printf "%s✓%s Found package: %s%s%s\n" "$GREEN" "$RESET" "$BOLD" "$PACKAGE_NAME" "$RESET"
+    printf "\nDownloading StartTunnel...\n"
     
     if command -v curl >/dev/null 2>&1; then
         printf "%s" "$DIM"
@@ -633,6 +674,11 @@ main() {
     check_debian
     ascii_banner
     ensure_root
+    
+    # Fetch latest version before checking existing installation
+    # This ensures we always check against the latest available version
+    fetch_latest_version
+    
     check_existing_installation
     
     if [ "$FRESH_INSTALL" = true ]; then
@@ -654,6 +700,7 @@ main() {
         if [ "$SERVICE_IS_RUNNING" = true ] && command -v start-tunnel >/dev/null 2>&1; then
             printf "\n"
             start-tunnel web init
+            printf "\n"
         fi
     else
         enable_and_start_service
