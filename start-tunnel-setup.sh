@@ -67,6 +67,9 @@ err() {
 
 fix_stdin() {
     if [ ! -t 0 ]; then
+        # Save original stdin to FD 3 before redirecting to /dev/tty
+        # This allows ensure_root() to still read the script from the pipe
+        exec 3<&0
         exec < /dev/tty
     fi
 }
@@ -151,9 +154,16 @@ ensure_root() {
         fi
         TEMP_SCRIPT=$(mktemp /tmp/start-tunnel-installer.XXXXXX.sh)
         trap 'rm -f "$TEMP_SCRIPT"' EXIT INT TERM
-        if [ ! -t 0 ] || [ "$0" = "sh" ] || [ "$0" = "bash" ]; then
+        # Check if FD 3 exists (saved original stdin from fix_stdin)
+        # or if we need to read from stdin (script was piped)
+        if ( : <&3 ) 2>/dev/null; then
+            # FD 3 exists: read from original pipe (saved before fix_stdin redirect)
+            cat <&3 > "$TEMP_SCRIPT"
+        elif [ ! -t 0 ] || [ "$0" = "sh" ] || [ "$0" = "bash" ]; then
+            # No FD 3: read from current stdin (script was piped but fix_stdin wasn't called yet)
             cat - > "$TEMP_SCRIPT"
         else
+            # Script is a file: copy it
             cp "$0" "$TEMP_SCRIPT"
         fi
         chmod +x "$TEMP_SCRIPT"
