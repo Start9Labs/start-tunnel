@@ -124,6 +124,13 @@ jobs:
             os: ubuntu-22.04-arm
 
     steps:
+      - name: Cleanup unnecessary files
+        run: |
+          sudo apt-get remove --purge -y google-chrome-stable firefox mono-devel || true
+          sudo apt-get autoremove -y || true
+          sudo apt-get clean || true
+          df -h
+
       - name: Checkout start-os
         uses: actions/checkout@v4
         with:
