@@ -5,6 +5,17 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      start_os_branch:
+        description: 'Start-OS branch to build from'
+        required: false
+        default: 'next/major'
+        type: string
+      prerelease:
+        description: 'Publish as pre-release'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -18,7 +29,31 @@ jobs:
       version: ${{ steps.get-version.outputs.version }}
       tag_exists: ${{ steps.check-tag.outputs.exists }}
       tag_name: ${{ steps.get-tag.outputs.tag_name }}
+      start_os_branch: ${{ steps.get-branch.outputs.branch }}
+      prerelease: ${{ steps.get-prerelease.outputs.prerelease }}
     steps:
+      - name: Determine start-os branch
+        id: get-branch
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            BRANCH="${{ github.event.inputs.start_os_branch }}"
+          else
+            BRANCH="next/major"
+          fi
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "Using start-os branch: $BRANCH"
+
+      - name: Determine pre-release flag
+        id: get-prerelease
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            PRERELEASE="${{ github.event.inputs.prerelease }}"
+          else
+            PRERELEASE="true"
+          fi
+          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Pre-release: $PRERELEASE"
+
       - name: Checkout start-os
         uses: actions/checkout@v4
         with:
@@ -37,7 +72,13 @@ jobs:
       - name: Determine tag name
         id: get-tag
         run: |
-          TAG_NAME="v${{ steps.get-version.outputs.version }}"
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+            # Use the tag that was pushed
+            TAG_NAME="${{ github.ref_name }}"
+          else
+            # Extract from Cargo.toml for workflow_dispatch
+            TAG_NAME="v${{ steps.get-version.outputs.version }}"
+          fi
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           echo "Tag name: $TAG_NAME"
 
@@ -87,7 +128,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: start9labs/start-os
-          ref: next/major
+          ref: ${{ needs.prepare.outputs.start_os_branch }}
           submodules: recursive
 
       - name: Setup Node.js
@@ -180,6 +221,7 @@ jobs:
           name: StartTunnel ${{ needs.prepare.outputs.tag_name }}
           tag_name: ${{ needs.prepare.outputs.tag_name }}
           body_path: release-packages/release-notes.txt
+          prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
