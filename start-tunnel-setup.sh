@@ -13,14 +13,12 @@ if command -v tput >/dev/null 2>&1; then
     YELLOW=$(tput setaf 3 2>/dev/null || echo '')
     RED=$(tput setaf 1 2>/dev/null || echo '')
     WHITE=$(tput setaf 7 2>/dev/null || echo '')
-    GREY=$(tput setaf 8 2>/dev/null || echo '')
     RESET=$(tput sgr0 2>/dev/null || echo '')
     DIM=$(tput dim 2>/dev/null || echo '')
 else
-    BOLD='' BLUE='' GREEN='' YELLOW='' RED='' WHITE='' GREY='' RESET='' DIM=''
+    BOLD='' BLUE='' GREEN='' YELLOW='' RED='' WHITE='' RESET='' DIM=''
 fi
 
-BOX_WIDTH=63
 BOX_COLOR="$DIM"
 
 box_start() {
@@ -141,7 +139,7 @@ ascii_banner() {
     box_line "start-tunnel" "center" "$WHITE$BOLD"
     box_empty
     box_line "Self-Hosted WireGuard VPN Server" "center" "$DIM"
-    box_line "Optimized for reverse tunneling access" "center" "$DIM"
+    box_line "optimized for reverse tunneling" "center" "$DIM"
     box_empty
     box_end
     printf "\n"
@@ -182,7 +180,6 @@ ensure_root() {
 # Installer configuration
 PACKAGE_NAME_BASE="start-tunnel"
 SERVICE_NAME="start-tunneld.service"
-MIN_DEBIAN_VERSION=12
 
 # Fetch latest release from GitHub (including prereleases)
 fetch_latest_version() {
@@ -214,8 +211,6 @@ INSTALLED_VERSION=""
 SERVICE_WAS_RUNNING=false
 SERVICE_WAS_ENABLED=false
 SERVICE_IS_RUNNING=false
-DNS_FIXED=false
-CONFIGURE_WEB_UI=false
 
 check_install_packages() {
     REQUIRED_PACKAGES="curl jq"
@@ -258,7 +253,6 @@ nameserver 1.0.0.1
 nameserver 9.9.9.9
 options timeout:2 attempts:3 rotate
 EOF
-            DNS_FIXED=true
             if ! ping -c 1 -W 2 github.com >/dev/null 2>&1; then
                 err "DNS configuration failed. Please check network connectivity"
             fi
@@ -413,58 +407,6 @@ enable_and_start_service() {
     fi
 }
 
-display_web_info() {
-    printf "\n"
-    box_start "$DIM$BLUE"
-    box_empty
-    box_line "Displaying current web interface configuration..." "center"
-    box_empty
-    box_end
-    printf "\n"
-    
-    if command -v start-tunnel >/dev/null 2>&1; then
-        start-tunnel web init
-    else
-        printf "%sWarning:%s start-tunnel command not found\n" "$YELLOW$BOLD" "$RESET"
-    fi
-}
-
-reconfigure_web_ui() {
-    printf "\n"
-    box_start "$DIM$BLUE"
-    box_empty
-    box_line "This will reset and reinitialize the web interface." "center"
-    box_empty
-    box_line "Options:"
-    box_line "  [i] Display current web information"
-    box_line "  [r] Reset and reconfigure web UI"
-    box_line "  [n] Cancel"
-    box_empty
-    box_end
-    printf "  %s>%s " "$BOLD" "$RESET"
-    
-    read -r WEB_CHOICE
-    
-    case "$WEB_CHOICE" in
-        [iI])
-            display_web_info
-            ;;
-        [rR])
-            printf "\nResetting web interface...\n"
-            if command -v start-tunnel >/dev/null 2>&1; then
-                start-tunnel web reset 2>/dev/null || true
-                printf "Initializing web interface...\n"
-                start-tunnel web init
-            else
-                printf "%sWarning:%s start-tunnel command not found\n" "$YELLOW$BOLD" "$RESET"
-            fi
-            ;;
-        *)
-            printf "\n%sCancelled%s\n" "$DIM" "$RESET"
-            ;;
-    esac
-}
-
 check_existing_installation() {
     if command -v dpkg >/dev/null 2>&1 && dpkg -l 2>/dev/null | grep -q "^ii.*$PACKAGE_NAME_BASE" 2>/dev/null; then
         FRESH_INSTALL=false
@@ -475,7 +417,7 @@ check_existing_installation() {
         printf "\n"
         box_start "$DIM$BLUE"
         box_empty
-        box_line "StartTunnel $INSTALLED_VERSION is already installed." "center"
+        box_line "StartTunnel current version: $INSTALLED_VERSION" "center"
         if [ "$SERVICE_WAS_RUNNING" = true ]; then
             box_line "Service is currently running." "center"
         else
@@ -483,40 +425,40 @@ check_existing_installation() {
         fi
         
         box_empty
-        box_line "Options:"
-        box_line "  [r] Reinstall package"
-        box_line "  [c] Configure web UI"
-        box_line "  [n] Cancel"
+        box_line "Install version $VERSION?"
+        box_line "  [y] Yes"
+        box_line "  [n] No"
         box_empty
         box_end
-        printf "  %s>%s " "$BOLD" "$RESET"
         
-        read -r CHOICE
-        
-        case "$CHOICE" in
-            [rR])
-                REINSTALL_MODE=true
-                stop_service
-                ;;
-            [cC])
-                reconfigure_web_ui
-                printf "\n"
-                exit 0
-                ;;
-            *)
-                printf "\n%sInstallation cancelled.%s\n\n" "$DIM" "$RESET"
-                exit 0
-                ;;
-        esac
+        while true; do
+            printf "  %s>%s " "$BOLD" "$RESET"
+            read -r CHOICE
+            
+            case "$CHOICE" in
+                [yY])
+                    REINSTALL_MODE=true
+                    stop_service
+                    break
+                    ;;
+                [nN])
+                    printf "\n%sInstallation cancelled.%s\n\n" "$DIM" "$RESET"
+                    exit 0
+                    ;;
+                *)
+                    printf "  %sPlease enter 'y' or 'n'%s\n" "$DIM" "$RESET"
+                    ;;
+            esac
+        done
     fi
 }
 
 detect_architecture() {
     MACHINE_ARCH=$(uname -m)
     case "$MACHINE_ARCH" in
-        x86_64) ARCH="x86_64"; DISPLAY_ARCH="Intel/AMD64";;
-        aarch64) ARCH="aarch64"; DISPLAY_ARCH="ARM64";;
-        riscv64) ARCH="riscv64"; DISPLAY_ARCH="RISC-V 64";;
+        x86_64) ARCH="x86_64";;
+        aarch64) ARCH="aarch64";;
+        riscv64) ARCH="riscv64";;
         *) err "Unsupported architecture: $MACHINE_ARCH";;
     esac
 }
@@ -595,80 +537,6 @@ verify_installation() {
     else
         err "Installation verification failed"
     fi
-}
-
-configure_web_ui() {
-    # Reload systemd daemon and check if service is running before attempting web UI configuration
-    systemctl daemon-reload 2>/dev/null || true
-    if ! systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-        printf "\n"
-        box_start "$DIM$YELLOW"
-        box_empty
-        box_line "Service is not running. Web interface cannot be configured." "center" "$BOLD"
-        box_empty
-        box_line "Please start the service first:" "center"
-        box_line "  systemctl start $SERVICE_NAME" "center" "$DIM"
-        box_line "  systemctl status $SERVICE_NAME" "center" "$DIM"
-        box_empty
-        box_line "Then run: start-tunnel web init" "center"
-        box_empty
-        box_end
-        printf "\n"
-        return
-    fi
-    
-    printf "\n"
-    box_start "$DIM$BLUE"
-    box_empty
-    box_line "StartTunnel includes a web interface for easy management." "center"
-    box_line "Would you like to initialize it now? (Recommended)" "center"
-    box_empty
-    box_line "[y] Yes, initialize web UI"
-    box_line "[n] No, configure later"
-    box_empty
-    box_end
-    printf "  %s>%s " "$BOLD" "$RESET"
-    
-    read -r WEB_RESPONSE
-    
-    case "$WEB_RESPONSE" in
-        [yY]|[yY][eE][sS])
-            printf "\n"
-            
-            # Reload systemd and verify service is still running before configuring
-            systemctl daemon-reload 2>/dev/null || true
-            if ! systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-                printf "%sError:%s Service is not running. Cannot configure web interface.\n" "$RED$BOLD" "$RESET"
-                printf "         Please start the service: %ssystemctl start %s%s\n" "$DIM" "$SERVICE_NAME" "$RESET"
-                printf "         Then run: %sstart-tunnel web init%s\n" "$DIM" "$RESET"
-                return
-            fi
-            
-            if [ "$REINSTALL_MODE" = true ]; then
-                printf "Resetting web interface...\n"
-                if command -v start-tunnel >/dev/null 2>&1; then
-                    start-tunnel web reset 2>/dev/null || true
-                fi
-            fi
-            
-            printf "Initializing web interface...\n"
-            
-            if command -v start-tunnel >/dev/null 2>&1; then
-                if start-tunnel web init; then
-                    CONFIGURE_WEB_UI=true
-                else
-                    printf "%sWarning:%s Web interface initialization had issues\n" "$YELLOW$BOLD" "$RESET"
-                    printf "         You can run: %sstart-tunnel web init%s\n" "$DIM" "$RESET"
-                fi
-            else
-                printf "%sWarning:%s start-tunnel command not found\n" "$YELLOW$BOLD" "$RESET"
-            fi
-            ;;
-        *)
-            printf "\n%sSkipping web interface setup%s\n" "$DIM" "$RESET"
-            printf "You can initialize it later with: %sstart-tunnel web init%s\n" "$DIM" "$RESET"
-            ;;
-    esac
 }
 
 main() {
