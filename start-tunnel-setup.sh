@@ -184,20 +184,27 @@ PACKAGE_NAME_BASE="start-tunnel"
 SERVICE_NAME="start-tunneld.service"
 MIN_DEBIAN_VERSION=12
 
-# Fetch latest version from GitHub releases
+# Fetch latest release from GitHub (including prereleases)
 fetch_latest_version() {
     printf "%s•%s Fetching latest version info from GitHub...\n" "$YELLOW" "$RESET"
-    
-    LATEST_RELEASE_URL="https://api.github.com/repos/Start9Labs/start-os/releases/latest"
-    
-    VERSION=$(curl -fsSL "$LATEST_RELEASE_URL" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/^v//')
-    
-    if [ -z "$VERSION" ]; then
+
+    # Fetch only the first release (most recent, including prereleases) using per_page=1
+    RELEASES_URL="https://api.github.com/repos/Start9Labs/start-os/releases?per_page=1"
+
+    LATEST_RELEASE_JSON=$(curl -fsSL "$RELEASES_URL" 2>/dev/null | jq '.[0]')
+
+    if [ -z "$LATEST_RELEASE_JSON" ] || [ "$LATEST_RELEASE_JSON" = "null" ]; then
+        err "Could not fetch release information from GitHub API."
+    fi
+
+    VERSION=$(printf '%s' "$LATEST_RELEASE_JSON" | jq -r '.tag_name' | sed 's/^v//')
+
+    if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
         err "Could not determine latest version from GitHub API."
     fi
-    
+
     printf "%s✓%s Found version: %s%s%s\n" "$GREEN" "$RESET" "$BOLD" "$VERSION" "$RESET"
-    
+
     BASE_URL="https://github.com/Start9Labs/start-os/releases/download/v${VERSION}"
 }
 
@@ -211,7 +218,7 @@ DNS_FIXED=false
 CONFIGURE_WEB_UI=false
 
 check_install_packages() {
-    REQUIRED_PACKAGES="curl wireguard-tools"
+    REQUIRED_PACKAGES="curl jq"
     MISSING_PACKAGES=""
     for pkg in $REQUIRED_PACKAGES; do
         if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
@@ -516,29 +523,14 @@ detect_architecture() {
 
 download_package() {
     TEMP_DIR=$(mktemp -d)
-    
-    # Fetch release assets to find the correct package name
+
+    # Find the correct package from the release assets (reusing LATEST_RELEASE_JSON from fetch_latest_version)
     printf "%s•%s Finding package for architecture %s...\n" "$YELLOW" "$RESET" "$ARCH"
-    
-    ASSETS_URL="https://api.github.com/repos/Start9Labs/start-tunnel/releases/latest"
-    RELEASE_JSON=$(curl -fsSL "$ASSETS_URL" 2>/dev/null)
-    
-    if [ -z "$RELEASE_JSON" ]; then
-        rm -rf "$TEMP_DIR"
-        err "Could not fetch release information from GitHub API."
-    fi
-    
-    # Find the .deb package that matches our architecture
-    # Package names typically end with _${ARCH}.deb
-    PACKAGE_NAME=$(echo "$RELEASE_JSON" | grep -o '"name":\s*"[^"]*\.deb"' | sed -E 's/.*"([^"]+)".*/\1/' | grep "_${ARCH}\.deb$" | head -1)
-    
-    if [ -z "$PACKAGE_NAME" ]; then
-        # Fallback: try to construct package name
-        # Look for any start-tunnel package pattern
-        PACKAGE_NAME=$(echo "$RELEASE_JSON" | grep -o '"name":\s*"[^"]*start-tunnel[^"]*\.deb"' | sed -E 's/.*"([^"]+)".*/\1/' | grep "${ARCH}" | head -1)
-    fi
-    
-    if [ -z "$PACKAGE_NAME" ]; then
+
+    # Find the .deb package that matches our architecture using jq
+    PACKAGE_NAME=$(printf '%s' "$LATEST_RELEASE_JSON" | jq -r --arg arch "$ARCH" '.assets[].name | select(endswith(".deb") and contains($arch))' | head -1)
+
+    if [ -z "$PACKAGE_NAME" ] || [ "$PACKAGE_NAME" = "null" ]; then
         rm -rf "$TEMP_DIR"
         err "Could not find package for architecture ${ARCH} in latest release."
     fi
@@ -684,19 +676,19 @@ main() {
     check_debian
     ascii_banner
     ensure_root
-    
+
+    check_install_packages
+    check_dns
+
     # Fetch latest version before checking existing installation
     # This ensures we always check against the latest available version
     fetch_latest_version
-    
+
     check_existing_installation
-    
+
     if [ "$FRESH_INSTALL" = true ]; then
         printf "Preparing system...\n"
     fi
-    
-    check_install_packages
-    check_dns
     check_disable_firewall
     detect_architecture
     download_package
