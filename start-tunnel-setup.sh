@@ -188,7 +188,7 @@ MIN_DEBIAN_VERSION=12
 fetch_latest_version() {
     printf "%s•%s Fetching latest version info from GitHub...\n" "$YELLOW" "$RESET"
     
-    LATEST_RELEASE_URL="https://api.github.com/repos/Start9Labs/start-tunnel/releases/latest"
+    LATEST_RELEASE_URL="https://api.github.com/repos/Start9Labs/start-os/releases/latest"
     
     VERSION=$(curl -fsSL "$LATEST_RELEASE_URL" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/^v//')
     
@@ -198,7 +198,7 @@ fetch_latest_version() {
     
     printf "%s✓%s Found version: %s%s%s\n" "$GREEN" "$RESET" "$BOLD" "$VERSION" "$RESET"
     
-    BASE_URL="https://github.com/Start9Labs/start-tunnel/releases/download/v${VERSION}"
+    BASE_URL="https://github.com/Start9Labs/start-os/releases/download/v${VERSION}"
 }
 
 REINSTALL_MODE=false
