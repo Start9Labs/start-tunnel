@@ -183,7 +183,7 @@ SERVICE_NAME="start-tunneld.service"
 
 # Fetch latest release from GitHub (including prereleases)
 fetch_latest_version() {
-    printf "%s•%s Fetching latest version info from GitHub...\n" "$YELLOW" "$RESET"
+    printf "%s•%s Fetching latest version info from GitHub..." "$YELLOW" "$RESET"
 
     # Fetch only the first release (most recent, including prereleases) using per_page=1
     RELEASES_URL="https://api.github.com/repos/Start9Labs/start-os/releases?per_page=1"
@@ -191,15 +191,18 @@ fetch_latest_version() {
     LATEST_RELEASE_JSON=$(curl -fsSL "$RELEASES_URL" 2>/dev/null | jq '.[0]')
 
     if [ -z "$LATEST_RELEASE_JSON" ] || [ "$LATEST_RELEASE_JSON" = "null" ]; then
+        printf "\n"
         err "Could not fetch release information from GitHub API."
     fi
 
     VERSION=$(printf '%s' "$LATEST_RELEASE_JSON" | jq -r '.tag_name' | sed 's/^v//')
 
     if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+        printf "\n"
         err "Could not determine latest version from GitHub API."
     fi
 
+    printf "\r%s✓%s Fetching latest version info from GitHub...\n" "$GREEN" "$RESET"
     printf "%s✓%s Found version: %s%s%s\n" "$GREEN" "$RESET" "$BOLD" "$VERSION" "$RESET"
 
     BASE_URL="https://github.com/Start9Labs/start-os/releases/download/v${VERSION}"
@@ -467,12 +470,13 @@ download_package() {
     TEMP_DIR=$(mktemp -d)
 
     # Find the correct package from the release assets (reusing LATEST_RELEASE_JSON from fetch_latest_version)
-    printf "%s•%s Finding package for architecture %s...\n" "$YELLOW" "$RESET" "$ARCH"
+    printf "%s•%s Finding package for architecture %s..." "$YELLOW" "$RESET" "$ARCH"
 
     # Find the .deb package that matches our architecture using jq
     PACKAGE_NAME=$(printf '%s' "$LATEST_RELEASE_JSON" | jq -r --arg arch "$ARCH" '.assets[].name | select(endswith(".deb") and contains($arch))' | head -1)
 
     if [ -z "$PACKAGE_NAME" ] || [ "$PACKAGE_NAME" = "null" ]; then
+        printf "\n"
         rm -rf "$TEMP_DIR"
         err "Could not find package for architecture ${ARCH} in latest release."
     fi
@@ -480,6 +484,7 @@ download_package() {
     DOWNLOAD_URL="${BASE_URL}/${PACKAGE_NAME}"
     PACKAGE_PATH="${TEMP_DIR}/${PACKAGE_NAME}"
 
+    printf "\r%s✓%s Finding package for architecture %s...  \n" "$GREEN" "$RESET" "$ARCH"
     printf "%s✓%s Found package: %s%s%s\n" "$GREEN" "$RESET" "$BOLD" "$PACKAGE_NAME" "$RESET"
     printf "\nDownloading StartTunnel...\n"
     
