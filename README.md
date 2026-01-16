@@ -1,69 +1,78 @@
 <p align="center">
-  <img src="icon.png" alt="Project Logo" width="21%">
+  <img src="icon.png" alt="StartTunnel" width="120">
 </p>
 
-# Start Tunnel Setup Script
+<h1 align="center">StartTunnel</h1>
 
-This repository contains the installer script for StartTunnel, a self-hosted WireGuard VPN server optimized for reverse tunneling access. The script provides a complete, turnkey installation on Debian-based VPS systems.
+<p align="center">
+  A self-hosted WireGuard VPN optimized for creating VLANs and reverse tunneling to personal servers.
+</p>
 
-## Quick Install
+## Why StartTunnel?
 
-The easiest way to install StartTunnel on your VPS:
+Think of it as a "virtual router in the cloud." Use it for private remote access to self-hosted services, or to expose services to the public Internet without revealing your server's IP address.
+
+- **Clearnet hosting** like Cloudflare Tunnels, but you control the server
+- **Private access** like Tailscale, but fully self-hosted
+- **Dead simple** — one command to install, one command to connect
+- **Open source** — audit it, fork it, own it
+
+## Features
+
+- **Create Subnets** — Each subnet creates a private VLAN, similar to the LAN created by a home router
+- **Add Devices** — Servers, phones, laptops get a LAN IP and unique WireGuard config
+- **Forward Ports** — Expose specific ports on specific devices to the public Internet
+
+## Install
+
+### 1. Get a VPS
+
+Rent a cheap Debian 12+ VPS with a dedicated public IP. Minimum CPU/RAM/disk is fine. For bandwidth, no need to exceed your home Internet's upload speed.
+
+### 2. Run the installer
+
+SSH into your VPS and run:
 
 ```bash
-curl -sSL https://start9labs.github.io/start-tunnel | sh
+curl -sSL https://start9labs.github.io/start-tunnel/install.sh | sh
 ```
 
-This one-line command will:
-- Validate your system (Debian 12+ required)
-- Configure networking (DNS, firewall)
-- Download and install StartTunnel
-- Automatically start and enable the service
-- Show instructions to initialize the web interface (fresh installs)
-- Auto-display web interface info on reinstall
-
-## Alternative Installation Methods
-
-### Download and Execute
+### 3. Initialize the web interface
 
 ```bash
-curl -fsSL https://start9labs.github.io/start-tunnel -o install.sh
-chmod +x install.sh
-./install.sh
+start-tunnel web init
 ```
 
-### Manual Script Execution
+You'll receive a URL, password, and Root CA certificate. To access the web interface without browser warnings, [trust the Root CA on your device](https://docs.start9.com).
 
-If you've cloned this repository:
+## Updating
+
+Re-run the install command:
 
 ```bash
-chmod +x start-tunnel-setup.sh
-sudo ./start-tunnel-setup.sh
+curl -sSL https://start9labs.github.io/start-tunnel/install.sh | sh
+```
+
+## CLI
+
+StartTunnel can be fully managed from the command line:
+
+```bash
+start-tunnel --help
 ```
 
 ## Requirements
 
-- **Operating System:** Debian 12+ (Bookworm or newer)
-- **Architecture:** x86_64, aarch64, or riscv64
-- **Access:** Root privileges (script will auto-escalate with sudo if needed)
-- **Network:** Internet connectivity for package downloads
+- Debian 12+ (Bookworm or newer)
+- x86_64, aarch64, or riscv64
+- Root access
+- Dedicated public IP
 
-## Features
+## Source Code
 
-- ✅ Automatic system validation and preparation
-- ✅ DNS configuration (if needed)
-- ✅ Firewall management (disables system firewalls, StartTunnel manages its own)
-- ✅ IP forwarding (handled automatically by the deb package)
-- ✅ Service auto-start and enable on boot
-- ✅ Clear instructions for web interface setup (fresh installs)
-- ✅ Auto-display web interface info on reinstall
-- ✅ Support for fresh installs and reinstalls
-- ✅ Clean, color-coded terminal interface
+This repo contains the installer and release automation. The StartTunnel source code lives in the [StartOS monorepo](https://github.com/Start9Labs/start-os).
 
-## Documentation
+## Learn More
 
-For detailed documentation about the installer's logic, functionality, and system impact, see [INSTALL.md](INSTALL.md).
-
-## Contributing
-
-Your contributions make this project better! Pull requests and issues are welcome.
+- [StartOS Documentation](https://docs.start9.com)
+- [Start9 Website](https://start9.com)
