@@ -7,12 +7,12 @@ on:
   workflow_dispatch:
     inputs:
       start_os_branch:
-        description: 'Start-OS branch to build from'
+        description: "Start-OS branch to build from"
         required: false
-        default: 'next/major'
+        default: "next/major"
         type: string
       prerelease:
-        description: 'Publish as pre-release'
+        description: "Publish as pre-release"
         required: false
         default: true
         type: boolean
@@ -20,6 +20,9 @@ on:
 permissions:
   contents: write
   actions: read
+
+env:
+  NODEJS_VERSION: "24.11.0"
 
 jobs:
   prepare:
@@ -39,36 +42,21 @@ jobs:
           else
             BRANCH="next/major"
           fi
-          # Default to next/major if empty
           if [[ -z "$BRANCH" ]]; then
             BRANCH="next/major"
           fi
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
           echo "Using start-os branch: $BRANCH"
 
-      - name: Determine pre-release flag
-        id: get-prerelease
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            PRERELEASE="${{ github.event.inputs.prerelease }}"
-          else
-            PRERELEASE="true"
-          fi
-          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
-          echo "Pre-release: $PRERELEASE"
-
-      - name: Checkout start-os
-        uses: actions/checkout@v4
-        with:
-          repository: start9labs/start-os
-          ref: ${{ steps.get-branch.outputs.branch }}
-          path: start-os
-          submodules: recursive
-
       - name: Extract version from Cargo.toml
         id: get-version
         run: |
-          VERSION=$(grep -m 1 'version = ' ./start-os/core/startos/Cargo.toml | sed 's/version = "\(.*\)".*/\1/')
+          CARGO_URL="https://raw.githubusercontent.com/Start9Labs/start-os/${{ steps.get-branch.outputs.branch }}/core/startos/Cargo.toml"
+          VERSION=$(curl -fsSL "$CARGO_URL" | grep -m 1 'version = ' | sed 's/version = "\(.*\)".*/\1/')
+          if [[ -z "$VERSION" ]]; then
+            echo "Failed to extract version from Cargo.toml"
+            exit 1
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION from branch ${{ steps.get-branch.outputs.branch }}"
 
@@ -79,7 +67,21 @@ jobs:
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           echo "Tag name: $TAG_NAME (from Cargo.toml)"
 
-  build:
+      - name: Determine pre-release flag
+        id: get-prerelease
+        run: |
+          TAG_NAME="v${{ steps.get-version.outputs.version }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            PRERELEASE="${{ github.event.inputs.prerelease }}"
+          elif [[ "$TAG_NAME" == *"alpha"* ]] || [[ "$TAG_NAME" == *"beta"* ]]; then
+            PRERELEASE="true"
+          else
+            PRERELEASE="false"
+          fi
+          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Pre-release: $PRERELEASE"
+
+  compile:
     name: Build ${{ matrix.arch }}
     needs: prepare
     runs-on: ${{ matrix.os }}
@@ -111,7 +113,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24.11.0"
+          node-version: ${{ env.NODEJS_VERSION }}
 
       - name: Set up docker QEMU
         uses: docker/setup-qemu-action@v3
@@ -152,7 +154,7 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [prepare, build]
+    needs: [prepare, compile]
 
     steps:
       - name: Download artifacts
