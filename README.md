@@ -70,7 +70,7 @@ start-tunnel --help
 
 ## Source Code
 
-This repo contains the installer and release automation. The StartTunnel source code lives in the [StartOS monorepo](https://github.com/Start9Labs/start-os).
+This repo hosts the installer script via GitHub Pages. The StartTunnel source code and release binaries live in the [StartOS monorepo](https://github.com/Start9Labs/start-os).
 
 ## Learn More
 
