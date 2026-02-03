@@ -36,9 +36,6 @@ box_line() {
     align="${2:-left}"
     text_style="${3:-}"
     text_len=$(printf "%s" "$text" | wc -m | tr -d ' ')
-    if printf "%s" "$text" | grep -q "[✓✗●○◆◇★☆]"; then
-        text_len=$((text_len))
-    fi
     if [ "$align" = "center" ]; then
         left_pad=$(( (61 - text_len) / 2 ))
         right_pad=$(( 63 - text_len - left_pad ))
@@ -103,7 +100,7 @@ check_debian() {
     if [ -n "${VERSION_ID:-}" ]; then
         DEBIAN_MAJOR=$(echo "$VERSION_ID" | cut -d. -f1)
     elif [ -f /etc/debian_version ]; then
-        DEBIAN_MAJOR=$(cat /etc/debian_version | cut -d. -f1)
+        DEBIAN_MAJOR=$(cut -d. -f1 /etc/debian_version)
     else
         DEBIAN_MAJOR="unknown"
     fi
@@ -468,6 +465,7 @@ detect_architecture() {
 
 download_package() {
     TEMP_DIR=$(mktemp -d)
+    trap 'rm -rf "$TEMP_DIR"' EXIT
 
     # Find the correct package from the release assets (reusing LATEST_RELEASE_JSON from fetch_latest_version)
     printf "%s•%s Finding package for architecture %s..." "$YELLOW" "$RESET" "$ARCH"
@@ -477,7 +475,6 @@ download_package() {
 
     if [ -z "$PACKAGE_NAME" ] || [ "$PACKAGE_NAME" = "null" ]; then
         printf "\n"
-        rm -rf "$TEMP_DIR"
         err "Could not find package for architecture ${ARCH} in latest release."
     fi
     
@@ -488,23 +485,12 @@ download_package() {
     printf "%s✓%s Found package: %s%s%s\n" "$GREEN" "$RESET" "$BOLD" "$PACKAGE_NAME" "$RESET"
     printf "\nDownloading StartTunnel...\n"
     
-    if command -v curl >/dev/null 2>&1; then
-        printf "%s" "$DIM"
-        if ! COLUMNS=65 curl --progress-bar -fL "$DOWNLOAD_URL" -o "$PACKAGE_PATH" 2>&1; then
-            printf "%s" "$RESET"
-            rm -rf "$TEMP_DIR"
-            err "Failed to download package"
-        fi
+    printf "%s" "$DIM"
+    if ! COLUMNS=65 curl --progress-bar -fL "$DOWNLOAD_URL" -o "$PACKAGE_PATH" 2>&1; then
         printf "%s" "$RESET"
-    elif command -v wget >/dev/null 2>&1; then
-        if ! wget -q --show-progress --progress=bar:force "$DOWNLOAD_URL" -O "$PACKAGE_PATH" 2>&1 | grep -v "^$"; then
-            rm -rf "$TEMP_DIR"
-            err "Failed to download package"
-        fi
-    else
-        rm -rf "$TEMP_DIR"
-        err "Neither wget nor curl is available"
+        err "Failed to download package"
     fi
+    printf "%s" "$RESET"
     printf "\n"
 }
 
@@ -524,14 +510,12 @@ install_package() {
             fi
         fi
     else
-        if ! apt install -y "$PACKAGE_PATH" >/dev/null 2>&1; then
+        if ! apt-get install -y "$PACKAGE_PATH" >/dev/null 2>&1; then
             if ! dpkg -i "$PACKAGE_PATH" >/dev/null 2>&1; then
                 apt-get install -f -y >/dev/null 2>&1
             fi
         fi
     fi
-    
-    rm -rf "$TEMP_DIR"
 }
 
 verify_installation() {
