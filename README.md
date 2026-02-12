@@ -8,71 +8,43 @@
   A self-hosted WireGuard VPN optimized for creating VLANs and reverse tunneling to personal servers.
 </p>
 
-## Why StartTunnel?
+## About
 
-Think of it as a "virtual router in the cloud." Use it for private remote access to self-hosted services, or to expose services to the public Internet without revealing your server's IP address.
+This repo hosts the StartTunnel installer script via GitHub Pages. The source code and release binaries live in the [StartOS monorepo](https://github.com/Start9Labs/start-os).
 
-- **Clearnet hosting** like Cloudflare Tunnels, but you control the server
-- **Private access** like Tailscale, but fully self-hosted
-- **Dead simple** — one command to install, one command to connect
-- **Open source** — audit it, fork it, own it
-
-## Features
-
-- **Create Subnets** — Each subnet creates a private VLAN, similar to the LAN created by a home router
-- **Add Devices** — Servers, phones, laptops get a LAN IP and unique WireGuard config
-- **Forward Ports** — Expose specific ports on specific devices to the public Internet
+For full documentation — features, security, CLI reference, and a detailed comparison with Cloudflare Tunnel and Tailscale — see the [StartTunnel docs](https://docs.start9.com).
 
 ## Install
 
-### 1. Get a VPS
-
-Rent a cheap Debian 12+ VPS with a dedicated public IP. Minimum CPU/RAM/disk is fine. For bandwidth, no need to exceed your home Internet's upload speed.
-
-### 2. Run the installer
-
-SSH into your VPS and run:
+SSH into a Debian 12+ VPS and run:
 
 ```bash
 curl -sSL https://start9labs.github.io/start-tunnel/install.sh | sh
 ```
 
-### 3. Initialize the web interface
+Then initialize the web interface:
 
 ```bash
 start-tunnel web init
 ```
 
-You'll receive a URL, password, and Root CA certificate. To access the web interface without browser warnings, [trust the Root CA on your device](https://docs.start9.com).
+You will be guided through setup and shown your web URL, password, and Root CA certificate.
 
-## Updating
+## Update
 
-Re-run the install command:
-
-```bash
-curl -sSL https://start9labs.github.io/start-tunnel/install.sh | sh
-```
-
-## CLI
-
-StartTunnel can be fully managed from the command line:
-
-```bash
-start-tunnel --help
-```
+Re-run the install command. The installer detects the existing installation, prompts for confirmation, and restarts the service.
 
 ## Requirements
 
 - Debian 12+ (Bookworm or newer)
 - x86_64, aarch64, or riscv64
 - Root access
-- Dedicated public IP
+- Dedicated VPS (the installer manages firewall rules — do not run alongside other services)
+- Public IP (required for clearnet port forwarding; not required for private VPN use)
 
-## Source Code
+## Links
 
-This repo hosts the installer script via GitHub Pages. The StartTunnel source code and release binaries live in the [StartOS monorepo](https://github.com/Start9Labs/start-os).
-
-## Learn More
-
-- [StartOS Documentation](https://docs.start9.com)
+- [StartTunnel Documentation](https://docs.start9.com/start-tunnel)
+- [Source Code](https://github.com/Start9Labs/start-os)
+- [Report an Issue](https://github.com/Start9Labs/start-os/issues)
 - [Start9 Website](https://start9.com)
