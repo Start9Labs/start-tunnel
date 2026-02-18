@@ -12,7 +12,7 @@
 
 This repo hosts the StartTunnel installer script via GitHub Pages. The source code and release binaries live in the [StartOS monorepo](https://github.com/Start9Labs/start-os).
 
-For full documentation — features, security, CLI reference, and a detailed comparison with Cloudflare Tunnel and Tailscale — see the [StartTunnel docs](https://docs.start9.com).
+For full documentation — features, security, CLI reference, and a detailed comparison with Cloudflare Tunnel and Tailscale — see the [StartTunnel docs](https://docs.start9.com/start-tunnel).
 
 ## Install
 
