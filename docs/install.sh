@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# start-tunnel installer for Debian 12+ VPS systems
-# Downloads and installs start-tunnel from official GitHub releases
+# start-tunnel installer for Debian 13 VPS systems
+# Installs start-tunnel from the official Start9 Debian repository
 
 set -e
 set -u
@@ -69,13 +69,13 @@ fix_stdin() {
     fi
 }
 
-# Support only Debian 12+, inform early if not and exit
+# Support only Debian 13, inform early if not and exit
 check_debian() {
     if [ ! -f /etc/os-release ]; then
         printf "\n"
         box_start "$DIM$RED"
         box_empty
-        box_line "StartTunnel requires Debian 12+ (Bookworm or newer)." center "$BOLD"
+        box_line "StartTunnel requires Debian 13." center "$BOLD"
         box_empty
         box_line "Could not find /etc/os-release: unsupported system." center
         box_empty
@@ -88,10 +88,10 @@ check_debian() {
         printf "\n"
         box_start "$DIM$RED"
         box_empty
-        box_line "StartTunnel installer supports ONLY Debian 12+ (Bookworm or newer)." center "$BOLD"
+        box_line "StartTunnel installer supports ONLY Debian 13." center "$BOLD"
         box_empty
         box_line "Detected: $NAME" center
-        box_line "Please run this script on Debian 12+ VPS." center
+        box_line "Please run this script on Debian 13 VPS." center
         box_empty
         box_end
         printf "\n"
@@ -109,7 +109,7 @@ check_debian() {
         box_start "$DIM$RED"
         box_empty
         box_line "Unable to detect Debian major version." center
-        box_line "Please run this script on Debian 12+ VPS." center
+        box_line "Please run this script on Debian 13 VPS." center
         box_empty
         box_end
         printf "\n"
@@ -120,7 +120,7 @@ check_debian() {
         box_start "$DIM$RED"
         box_empty
         box_line "Detected: Debian $DEBIAN_MAJOR" center
-        box_line "Required: Debian 12+ (Bookworm or newer)" center
+        box_line "Required: Debian 13" center
         box_line "Please upgrade and run again." center
         box_empty
         box_end
@@ -175,35 +175,16 @@ ensure_root() {
 }
 
 # Installer configuration
-PACKAGE_NAME_BASE="start-tunnel"
+PACKAGE_NAME="start-tunnel"
 SERVICE_NAME="start-tunneld.service"
 
-# Fetch latest release from GitHub (including prereleases)
-fetch_latest_version() {
-    printf "%s•%s Fetching latest version info from GitHub..." "$YELLOW" "$RESET"
+# Start9 apt repository
+REPO_URL="https://start9-debs.nyc3.cdn.digitaloceanspaces.com"
+KEYRING_PATH="/usr/share/keyrings/start9.gpg"
+SOURCES_PATH="/etc/apt/sources.list.d/start9.list"
 
-    # Fetch only the first release (most recent, including prereleases) using per_page=1
-    RELEASES_URL="https://api.github.com/repos/Start9Labs/start-os/releases?per_page=1"
-
-    LATEST_RELEASE_JSON=$(curl -fsSL "$RELEASES_URL" 2>/dev/null | jq '.[0]')
-
-    if [ -z "$LATEST_RELEASE_JSON" ] || [ "$LATEST_RELEASE_JSON" = "null" ]; then
-        printf "\n"
-        err "Could not fetch release information from GitHub API."
-    fi
-
-    VERSION=$(printf '%s' "$LATEST_RELEASE_JSON" | jq -r '.tag_name' | sed 's/^v//')
-
-    if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
-        printf "\n"
-        err "Could not determine latest version from GitHub API."
-    fi
-
-    printf "\r%s✓%s Fetching latest version info from GitHub...\n" "$GREEN" "$RESET"
-    printf "%s✓%s Found version: %s%s%s\n" "$GREEN" "$RESET" "$BOLD" "$VERSION" "$RESET"
-
-    BASE_URL="https://github.com/Start9Labs/start-os/releases/download/v${VERSION}"
-}
+# GPG public key URL for the Start9 apt repository
+START9_GPG_KEY_URL="https://raw.githubusercontent.com/Start9Labs/start-os/next/major/apt/start9.gpg"
 
 REINSTALL_MODE=false
 FRESH_INSTALL=true
@@ -212,29 +193,22 @@ SERVICE_WAS_RUNNING=false
 SERVICE_WAS_ENABLED=false
 SERVICE_IS_RUNNING=false
 
-check_install_packages() {
-    REQUIRED_PACKAGES="curl jq"
-    MISSING_PACKAGES=""
-    for pkg in $REQUIRED_PACKAGES; do
-        if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
-            MISSING_PACKAGES="$MISSING_PACKAGES $pkg"
-        fi
-    done
-    if [ -n "$MISSING_PACKAGES" ]; then
-        printf "Installing required packages:%s\n" "$MISSING_PACKAGES"
+check_dependencies() {
+    if ! command -v curl >/dev/null 2>&1; then
+        printf "Installing curl...\n"
         apt-get update -qq 2>/dev/null || true
-        if ! apt-get install -y $MISSING_PACKAGES >/dev/null 2>&1; then
-            err "Failed to install required packages:$MISSING_PACKAGES"
+        if ! apt-get install -y curl >/dev/null 2>&1; then
+            err "Failed to install curl"
         fi
     fi
 }
 
 check_dns() {
-    if ! ping -c 1 -W 2 github.com >/dev/null 2>&1; then
+    if ! ping -c 1 -W 2 deb.debian.org >/dev/null 2>&1; then
         printf "\n"
         box_start "$DIM$YELLOW"
         box_empty
-        box_line "Cannot resolve github.com. Checking connectivity..."
+        box_line "Cannot resolve deb.debian.org. Checking connectivity..."
         box_end
         if ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1 || ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
             printf "Fixing DNS configuration...\n"
@@ -253,7 +227,7 @@ nameserver 1.0.0.1
 nameserver 9.9.9.9
 options timeout:2 attempts:3 rotate
 EOF
-            if ! ping -c 1 -W 2 github.com >/dev/null 2>&1; then
+            if ! ping -c 1 -W 2 deb.debian.org >/dev/null 2>&1; then
                 err "DNS configuration failed. Please check network connectivity"
             fi
             printf "\n"
@@ -272,7 +246,7 @@ EOF
 
 check_disable_firewall() {
     FIREWALL_DISABLED=false
-    
+
     if command -v ufw >/dev/null 2>&1; then
         UFW_STATUS=$(ufw status 2>/dev/null | head -1 | awk '{print $2}')
         if [ "$UFW_STATUS" != "inactive" ]; then
@@ -283,14 +257,14 @@ check_disable_firewall() {
             box_line "firewall rules. Disabling UFW..."
             box_empty
             box_end
-            
+
             ufw disable >/dev/null 2>&1 || true
             systemctl disable ufw 2>/dev/null || true
             systemctl stop ufw 2>/dev/null || true
             FIREWALL_DISABLED=true
         fi
     fi
-    
+
     if command -v iptables >/dev/null 2>&1; then
         if [ "$(iptables -L -n 2>/dev/null | wc -l)" -gt 8 ]; then
             if [ "$FIREWALL_DISABLED" = false ]; then
@@ -302,7 +276,7 @@ check_disable_firewall() {
                 box_empty
                 box_end
             fi
-            
+
             iptables -P INPUT ACCEPT 2>/dev/null || true
             iptables -P FORWARD ACCEPT 2>/dev/null || true
             iptables -P OUTPUT ACCEPT 2>/dev/null || true
@@ -311,7 +285,7 @@ check_disable_firewall() {
             FIREWALL_DISABLED=true
         fi
     fi
-    
+
     if [ "$FIREWALL_DISABLED" = true ]; then
         printf "System firewall disabled\n"
     fi
@@ -321,7 +295,7 @@ check_service_status() {
     if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
         SERVICE_WAS_RUNNING=true
     fi
-    
+
     if systemctl is-enabled --quiet "$SERVICE_NAME" 2>/dev/null; then
         SERVICE_WAS_ENABLED=true
     fi
@@ -338,7 +312,7 @@ stop_service() {
 restart_service() {
     if [ "$SERVICE_WAS_RUNNING" = true ]; then
         systemctl daemon-reload 2>/dev/null || true
-        
+
         if systemctl start "$SERVICE_NAME" 2>/dev/null; then
             sleep 2
             if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
@@ -369,7 +343,7 @@ restart_service() {
             SERVICE_IS_RUNNING=false
         fi
     fi
-    
+
     if [ "$SERVICE_WAS_ENABLED" = true ]; then
         if ! systemctl is-enabled --quiet "$SERVICE_NAME" 2>/dev/null; then
             systemctl enable "$SERVICE_NAME" 2>/dev/null || true
@@ -379,16 +353,16 @@ restart_service() {
 
 enable_and_start_service() {
     printf "Enabling and starting service...\n"
-    
+
     systemctl daemon-reload 2>/dev/null || true
-    
+
     # Enable service to start on boot
     if systemctl enable "$SERVICE_NAME" 2>/dev/null; then
         printf "Service enabled for auto-start on boot\n"
     else
         printf "%sWarning:%s Could not enable service\n" "$YELLOW$BOLD" "$RESET"
     fi
-    
+
     # Start service now
     if systemctl start "$SERVICE_NAME" 2>/dev/null; then
         sleep 2
@@ -407,34 +381,67 @@ enable_and_start_service() {
     fi
 }
 
+setup_repository() {
+    printf "%s•%s Configuring Start9 apt repository..." "$YELLOW" "$RESET"
+
+    # Download and install GPG keyring
+    if ! curl -fsSL "$START9_GPG_KEY_URL" -o "$KEYRING_PATH"; then
+        printf "\n"
+        err "Failed to download GPG key from $START9_GPG_KEY_URL"
+    fi
+
+    # Install sources list
+    printf 'deb [arch=amd64,arm64,riscv64 signed-by=%s] %s stable main\n' \
+        "$KEYRING_PATH" "$REPO_URL" > "$SOURCES_PATH"
+
+    printf "\r%s✓%s Configuring Start9 apt repository...\n" "$GREEN" "$RESET"
+
+    printf "%s•%s Updating package lists..." "$YELLOW" "$RESET"
+    if ! apt-get update -qq >/dev/null 2>&1; then
+        printf "\n"
+        err "Failed to update package lists. Check network connectivity."
+    fi
+    printf "\r%s✓%s Updating package lists...\n" "$GREEN" "$RESET"
+}
+
 check_existing_installation() {
-    if command -v dpkg >/dev/null 2>&1 && dpkg -l 2>/dev/null | grep -q "^ii.*$PACKAGE_NAME_BASE" 2>/dev/null; then
+    # Get version info from apt
+    POLICY=$(apt-cache policy "$PACKAGE_NAME" 2>/dev/null || true)
+    VERSION=$(printf '%s' "$POLICY" | grep 'Candidate:' | awk '{print $2}')
+    INSTALLED_VERSION=$(printf '%s' "$POLICY" | grep 'Installed:' | awk '{print $2}')
+
+    if [ -z "$VERSION" ] || [ "$VERSION" = "(none)" ]; then
+        err "Package $PACKAGE_NAME not found in repository."
+    fi
+
+    printf "%s✓%s Found version: %s%s%s\n" "$GREEN" "$RESET" "$BOLD" "$VERSION" "$RESET"
+
+    if [ "$INSTALLED_VERSION" != "(none)" ] && [ -n "$INSTALLED_VERSION" ]; then
         FRESH_INSTALL=false
-        INSTALLED_VERSION=$(dpkg -s "$PACKAGE_NAME_BASE" 2>/dev/null | grep '^Version:' | awk '{print $2}')
-        
+
         check_service_status
-        
+
         printf "\n"
         box_start "$DIM$BLUE"
         box_empty
-        box_line "StartTunnel current version: $INSTALLED_VERSION" "center"
+        box_line "StartTunnel installed: $INSTALLED_VERSION" "center"
         if [ "$SERVICE_WAS_RUNNING" = true ]; then
             box_line "Service is currently running." "center"
         else
             box_line "Service is not running." "center"
         fi
-        
+
         box_empty
         box_line "Install version $VERSION?"
         box_line "  [y] Yes"
         box_line "  [n] No"
         box_empty
         box_end
-        
+
         while true; do
             printf "  %s>%s " "$BOLD" "$RESET"
             read -r CHOICE
-            
+
             case "$CHOICE" in
                 [yY])
                     REINSTALL_MODE=true
@@ -453,79 +460,25 @@ check_existing_installation() {
     fi
 }
 
-detect_architecture() {
-    MACHINE_ARCH=$(uname -m)
-    case "$MACHINE_ARCH" in
-        x86_64) ARCH="x86_64";;
-        aarch64) ARCH="aarch64";;
-        riscv64) ARCH="riscv64";;
-        *) err "Unsupported architecture: $MACHINE_ARCH";;
-    esac
-}
-
-download_package() {
-    TEMP_DIR=$(mktemp -d)
-    trap 'rm -rf "$TEMP_DIR"' EXIT
-
-    # Find the correct package from the release assets (reusing LATEST_RELEASE_JSON from fetch_latest_version)
-    printf "%s•%s Finding package for architecture %s..." "$YELLOW" "$RESET" "$ARCH"
-
-    # Find the .deb package that matches our architecture using jq
-    PACKAGE_NAME=$(printf '%s' "$LATEST_RELEASE_JSON" | jq -r --arg arch "$ARCH" '.assets[].name | select(endswith(".deb") and contains($arch))' | head -1)
-
-    if [ -z "$PACKAGE_NAME" ] || [ "$PACKAGE_NAME" = "null" ]; then
-        printf "\n"
-        err "Could not find package for architecture ${ARCH} in latest release."
-    fi
-    
-    DOWNLOAD_URL="${BASE_URL}/${PACKAGE_NAME}"
-    PACKAGE_PATH="${TEMP_DIR}/${PACKAGE_NAME}"
-
-    printf "\r%s✓%s Finding package for architecture %s...  \n" "$GREEN" "$RESET" "$ARCH"
-    printf "%s✓%s Found package: %s%s%s\n" "$GREEN" "$RESET" "$BOLD" "$PACKAGE_NAME" "$RESET"
-    printf "\nDownloading StartTunnel...\n"
-    
-    printf "%s" "$DIM"
-    if ! COLUMNS=65 curl --progress-bar -fL "$DOWNLOAD_URL" -o "$PACKAGE_PATH" 2>&1; then
-        printf "%s" "$RESET"
-        err "Failed to download package"
-    fi
-    printf "%s" "$RESET"
-    printf "\n"
-}
-
 install_package() {
     if [ "$REINSTALL_MODE" = true ]; then
-        printf "Reinstalling...\n"
-    else
         printf "Installing...\n"
-    fi
-    
-    apt-get update -qq 2>/dev/null || true
-    
-    if [ "$REINSTALL_MODE" = true ]; then
-        if ! apt-get --reinstall install -y "$PACKAGE_PATH" >/dev/null 2>&1; then
-            if ! dpkg -i "$PACKAGE_PATH" >/dev/null 2>&1; then
-                apt-get install -f -y >/dev/null 2>&1
-            fi
+        if ! DEBIAN_FRONTEND=noninteractive apt-get install -y --reinstall "$PACKAGE_NAME" >/dev/null 2>&1; then
+            err "Failed to install $PACKAGE_NAME"
         fi
     else
-        if ! apt-get install -y "$PACKAGE_PATH" >/dev/null 2>&1; then
-            if ! dpkg -i "$PACKAGE_PATH" >/dev/null 2>&1; then
-                apt-get install -f -y >/dev/null 2>&1
-            fi
+        printf "Installing...\n"
+        if ! DEBIAN_FRONTEND=noninteractive apt-get install -y "$PACKAGE_NAME" >/dev/null 2>&1; then
+            err "Failed to install $PACKAGE_NAME"
         fi
     fi
 }
 
 verify_installation() {
-    if command -v start-tunnel >/dev/null 2>&1; then
-        INSTALLED_VERSION=$(start-tunnel --version 2>/dev/null || echo "$VERSION")
-    elif command -v dpkg >/dev/null 2>&1 && dpkg -l 2>/dev/null | grep -q start-tunnel; then
-        INSTALLED_VERSION=$(dpkg -s "$PACKAGE_NAME_BASE" 2>/dev/null | grep '^Version:' | awk '{print $2}')
-    else
+    if ! dpkg -l "$PACKAGE_NAME" 2>/dev/null | grep -q "^ii"; then
         err "Installation verification failed"
     fi
+    INSTALLED_VERSION=$(dpkg -s "$PACKAGE_NAME" 2>/dev/null | grep '^Version:' | awk '{print $2}')
 }
 
 main() {
@@ -534,27 +487,21 @@ main() {
     ascii_banner
     ensure_root
 
-    check_install_packages
+    check_dependencies
     check_dns
-
-    # Fetch latest version before checking existing installation
-    # This ensures we always check against the latest available version
-    fetch_latest_version
-
+    setup_repository
     check_existing_installation
 
     if [ "$FRESH_INSTALL" = true ]; then
         printf "Preparing system...\n"
     fi
     check_disable_firewall
-    detect_architecture
-    download_package
     install_package
     verify_installation
 
     if [ "$REINSTALL_MODE" = true ]; then
         restart_service
-        
+
         # For reinstalls, automatically run web init if service is running
         if [ "$SERVICE_IS_RUNNING" = true ] && command -v start-tunnel >/dev/null 2>&1; then
             printf "\n"
@@ -563,7 +510,7 @@ main() {
         fi
     else
         enable_and_start_service
-        
+
         # For fresh installs, show success message with instructions
         printf "\n"
         box_start "$DIM$GREEN"
@@ -581,7 +528,7 @@ main() {
         box_end
         printf "\n"
     fi
-    
+
     # Close TTY redirection if it was opened
     exec 0<&- 2>/dev/null || true
 }
