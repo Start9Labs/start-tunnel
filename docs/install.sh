@@ -184,7 +184,7 @@ KEYRING_PATH="/usr/share/keyrings/start9.gpg"
 SOURCES_PATH="/etc/apt/sources.list.d/start9.list"
 
 # GPG public key URL for the Start9 apt repository
-START9_GPG_KEY_URL="https://raw.githubusercontent.com/Start9Labs/start-os/next/major/apt/start9.gpg"
+START9_GPG_KEY_URL="https://start9.com/start9.gpg"
 
 REINSTALL_MODE=false
 FRESH_INSTALL=true
